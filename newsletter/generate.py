@@ -20,6 +20,8 @@ def _format_articles_for_prompt(news: dict[str, list[dict]]) -> str:
             lines.append(f"{i}. [{a['source']}] {a['title']}")
             if a["summary"]:
                 lines.append(f"   Summary: {a['summary']}")
+            if a.get("image"):
+                lines.append(f"   Image: {a['image']}")
     return "\n".join(lines)
 
 
@@ -38,21 +40,26 @@ Write a complete HTML newsletter with this exact structure:
 
 2. Four sections, each with:
    - A colored section label in uppercase (e.g. VIETNAM TODAY) styled as a small blue uppercase heading
+   - If the lead article has an "Image:" URL, place a full-width <img> tag right below the section label, before the headline. Style: width:100%;border-radius:6px;margin-bottom:14px;display:block;
    - A bold, punchy headline (not just the article title — rewrite it to be engaging)
-   - 2-3 paragraphs synthesizing the most important stories from that section. Use bullet points where helpful. Keep it under 200 words per section.
+   - Coverage depth rules:
+     * LEAD STORY (first/most important): write 3-4 paragraphs with context, background, and implications. Use bullet points for key facts. ~300 words.
+     * SUPPORTING STORIES: 1-2 paragraphs each, ~100 words. Weave them naturally after the lead.
+   - If multiple stories in a section are related, connect them into a cohesive narrative.
 
-3. A "QUICK BITES" section at the end: 3-4 one-sentence bullets covering any remaining notable stories.
+3. A "QUICK BITES" section at the end: 4-5 one-sentence bullets covering remaining notable stories not covered above.
 
 4. A short sign-off (2 sentences max).
 
 IMPORTANT HTML requirements:
 - Use inline CSS for all styling (emails don't support external stylesheets)
 - Max width 600px, centered, white background, clean font (font-family: Georgia, serif for body; Arial, sans-serif for headings)
-- Section labels: small caps, color #1a73e8 (blue), font-size 12px, letter-spacing 1px
-- Headlines: font-size 22px, font-weight bold, color #111, margin-bottom 8px
-- Body text: font-size 15px, line-height 1.6, color #333
-- Each section in a rounded card with light gray border (#e8e8e8), padding 20px, margin-bottom 20px
-- Quick Bites bullets: compact, no extra spacing
+- Section labels: small caps, color #1a73e8 (blue), font-size 12px, letter-spacing 1px, font-weight:600
+- Headlines: font-size 22px, font-weight bold, color #111, margin-bottom 10px
+- Body text: font-size 15px, line-height 1.7, color #333
+- Each section in a rounded card with light gray border (#e8e8e8), padding 24px, margin-bottom 20px
+- Images: width:100%, border-radius:6px, margin-bottom:14px, display:block — only include if an Image URL was provided for that article
+- Quick Bites bullets: compact, font-size 14px, no extra spacing
 - Do NOT include any ads, sponsor messages, or referral links
 - Output ONLY the HTML — no markdown, no code fences, just raw HTML starting with <div>
 """
@@ -70,7 +77,7 @@ def generate_newsletter(news: dict[str, list[dict]]) -> str:
 
     message = client.messages.create(
         model=CLAUDE_MODEL,
-        max_tokens=4096,
+        max_tokens=8000,
         messages=[{"role": "user", "content": prompt}],
     )
     html_body = message.content[0].text.strip()

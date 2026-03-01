@@ -15,8 +15,9 @@ NEWS_SOURCES = {
     ],
     "business": [
         {"name": "Reuters Business", "url": "https://feeds.reuters.com/reuters/businessNews"},
+        {"name": "CNBC Markets", "url": "https://www.cnbc.com/id/10001147/device/rss/rss.html"},
     ],
 }
 
-ARTICLES_PER_SOURCE = 4
+ARTICLES_PER_SOURCE = 6
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
