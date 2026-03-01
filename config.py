@@ -1,4 +1,8 @@
-RECIPIENT_EMAIL = "thtoan39@gmail.com"
+RECIPIENT_EMAILS = [
+    "thtoan39@gmail.com",
+    "myhaworkcontact@gmail.com",
+    "toan.nguyen.220107@student.fulbright.edu.vn",
+]
 
 NEWS_SOURCES = {
     "vietnam": [

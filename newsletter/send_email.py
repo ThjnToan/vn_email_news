@@ -3,7 +3,7 @@ import smtplib
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from config import RECIPIENT_EMAIL
+from config import RECIPIENT_EMAILS
 
 
 def send_newsletter(html_content: str) -> None:
@@ -19,7 +19,7 @@ def send_newsletter(html_content: str) -> None:
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = gmail_user
-    msg["To"] = RECIPIENT_EMAIL
+    msg["To"] = ", ".join(RECIPIENT_EMAILS)
 
     msg.attach(MIMEText(html_content, "html"))
 
@@ -27,6 +27,6 @@ def send_newsletter(html_content: str) -> None:
         server.ehlo()
         server.starttls()
         server.login(gmail_user, gmail_password)
-        server.sendmail(gmail_user, RECIPIENT_EMAIL, msg.as_string())
+        server.sendmail(gmail_user, RECIPIENT_EMAILS, msg.as_string())
 
-    print(f"Newsletter sent to {RECIPIENT_EMAIL}")
+    print(f"Newsletter sent to {len(RECIPIENT_EMAILS)} recipient(s): {', '.join(RECIPIENT_EMAILS)}")

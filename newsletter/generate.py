@@ -58,6 +58,19 @@ def _section_card(label: str, image_url: str, headline: str, body: str) -> str:
 </div>"""
 
 
+def _opener_card(opener: dict) -> str:
+    emoji = opener.get("emoji", "☀️")
+    label = opener.get("label", "GOOD MORNING")
+    text = opener.get("text", "")
+    return f"""<div style="background:#FFFBEA;border-left:4px solid #F5A623;border-radius:8px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:flex-start;gap:14px;">
+  <span style="font-size:36px;line-height:1;flex-shrink:0;">{emoji}</span>
+  <div>
+    <p style="font-size:10px;font-weight:700;color:#B87800;letter-spacing:2px;text-transform:uppercase;margin:0 0 6px 0;">{label}</p>
+    <p style="font-size:15px;line-height:1.7;color:#5C4300;margin:0;">{text}</p>
+  </div>
+</div>"""
+
+
 def _quick_bites_card(items: list[str]) -> str:
     lis = "".join(
         f'<li style="margin-bottom:8px;">{item}</li>' for item in items
@@ -79,6 +92,11 @@ News articles:
 Return a single valid JSON object with this exact structure (use single quotes inside HTML attribute values to avoid breaking JSON):
 
 {{
+  "opener": {{
+    "emoji": "🌿",
+    "label": "DID YOU KNOW?",
+    "text": "One cheerful, surprising, or delightful sentence. Pick freely from: a fun world fact, an 'on this day in history' moment, a witty observation about today's day of the week, a short uplifting quote, or something whimsical. Make the reader smile."
+  }},
   "intro": "<p style='font-size:16px;line-height:1.7;color:#333;'>2-3 sentence friendly Good Morning intro here.</p>",
   "sections": {{
     "vietnam":  {{"headline": "Punchy rewritten headline", "body": "<p>Lead story 3-4 paragraphs ~300 words with bullet points for key facts.</p><p>Supporting story 1-2 paragraphs.</p>"}},
@@ -129,6 +147,7 @@ def generate_newsletter(news: dict[str, list[dict]]) -> str:
         raise ValueError(f"Failed to parse JSON from Claude response. Raw output:\n{raw[:500]}")
 
     # Build HTML — Python controls the card structure and image placement
+    opener_html = _opener_card(data.get("opener", {}))
     intro_html = data.get("intro", "")
     signoff_html = f'<p style="font-size:15px;line-height:1.7;color:#666;margin-top:8px;">{data.get("signoff", "")}</p>'
 
@@ -144,7 +163,7 @@ def generate_newsletter(news: dict[str, list[dict]]) -> str:
     quick_bites = data.get("quick_bites", [])
     quick_html = _quick_bites_card(quick_bites) if quick_bites else ""
 
-    body_html = intro_html + sections_html + quick_html + signoff_html
+    body_html = opener_html + intro_html + sections_html + quick_html + signoff_html
 
     return f"""<!DOCTYPE html>
 <html lang="en">
