@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
-import google.generativeai as genai
-from config import GEMINI_MODEL
+import anthropic
+from config import CLAUDE_MODEL
 
 SECTION_LABELS = {
     "vietnam": "VIETNAM TODAY",
@@ -59,18 +59,21 @@ IMPORTANT HTML requirements:
 
 
 def generate_newsletter(news: dict[str, list[dict]]) -> str:
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set")
+        raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(GEMINI_MODEL)
+    client = anthropic.Anthropic(api_key=api_key)
 
     date_str = datetime.now().strftime("%A, %B %d, %Y")
     prompt = _build_prompt(news, date_str)
 
-    response = model.generate_content(prompt)
-    html_body = response.text.strip()
+    message = client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    html_body = message.content[0].text.strip()
 
     # Wrap in a full HTML document with email-friendly structure
     return f"""<!DOCTYPE html>
@@ -83,14 +86,14 @@ def generate_newsletter(news: dict[str, list[dict]]) -> str:
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
   <div style="max-width:600px;margin:30px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
     <div style="background:#1a73e8;padding:24px 28px;">
-      <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">☀️ Your Daily Brew</h1>
-      <p style="margin:6px 0 0;color:#d0e4ff;font-size:13px;">{date_str} &nbsp;·&nbsp; Vietnam &amp; World Edition</p>
+      <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">&#9728;&#65039; Your Daily Brew</h1>
+      <p style="margin:6px 0 0;color:#d0e4ff;font-size:13px;">{date_str} &nbsp;&middot;&nbsp; Vietnam &amp; World Edition</p>
     </div>
     <div style="padding:24px 28px;">
       {html_body}
     </div>
     <div style="background:#f5f5f5;padding:16px 28px;text-align:center;font-size:12px;color:#999;">
-      Your personalized daily newsletter &nbsp;·&nbsp; Vietnam &amp; Global News
+      Your personalized daily newsletter &nbsp;&middot;&nbsp; Vietnam &amp; Global News
     </div>
   </div>
 </body>

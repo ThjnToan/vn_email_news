@@ -19,4 +19,4 @@ NEWS_SOURCES = {
 }
 
 ARTICLES_PER_SOURCE = 4
-GEMINI_MODEL = "gemini-2.0-flash"
+CLAUDE_MODEL = "claude-haiku-4-5-20251001"
