@@ -9,7 +9,7 @@ def main():
     total = sum(len(v) for v in news.values())
     print(f"Fetched {total} articles across {len(news)} sections")
 
-    print("Generating newsletter with Gemini...")
+    print("Generating newsletter with Claude...")
     html = generate_newsletter(news)
     print(f"Generated {len(html)} characters of HTML")
 
