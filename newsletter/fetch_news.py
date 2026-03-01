@@ -2,70 +2,84 @@ import feedparser
 import html
 import re
 import requests
+from urllib.parse import urljoin
 from config import NEWS_SOURCES, ARTICLES_PER_SOURCE
 
-_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; NewsletterBot/1.0)"}
+# Full browser-like headers to avoid being blocked
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/121.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Connection": "keep-alive",
+}
 
 
 def _clean_text(text: str) -> str:
-    """Strip HTML tags and normalize whitespace."""
     text = re.sub(r"<[^>]+>", " ", text)
     text = html.unescape(text)
     return " ".join(text.split()).strip()
 
 
 def _extract_rss_image(entry) -> str:
-    """Try to pull an image URL from RSS feed fields (fast, no HTTP request)."""
-    # media:content
+    """Pull image from RSS feed fields (no HTTP request needed)."""
     for m in entry.get("media_content", []):
         url = m.get("url", "")
         if url:
             return url
-
-    # media:thumbnail
     for m in entry.get("media_thumbnail", []):
         url = m.get("url", "")
         if url:
             return url
-
-    # enclosures
     for enc in entry.get("enclosures", []):
         if enc.get("type", "").startswith("image/"):
             return enc.get("href", enc.get("url", ""))
-
-    # <img> tag buried in summary/content HTML
     raw = entry.get("summary", "") or ""
     if not raw and entry.get("content"):
         raw = entry["content"][0].get("value", "")
-    match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw)
-    if match:
-        return match.group(1)
-
+    m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw)
+    if m:
+        return m.group(1)
     return ""
 
 
-def _fetch_og_image(url: str) -> str:
-    """Fetch the article page and extract the og:image meta tag."""
-    if not url:
+def _fetch_og_image(article_url: str) -> str:
+    """Fetch article page and extract og:image or twitter:image."""
+    if not article_url:
         return ""
     try:
-        resp = requests.get(url, timeout=7, headers=_HEADERS)
-        # Try both attribute orderings of the meta tag
-        patterns = [
-            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
-            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
-        ]
-        for pat in patterns:
-            m = re.search(pat, resp.text)
-            if m:
-                return m.group(1)
+        resp = requests.get(article_url, timeout=8, headers=_HEADERS)
+        page = resp.text
+
+        # Two-step: find any <meta> tag that contains og:image or twitter:image,
+        # then pull the content= value from it. Much more robust than one regex.
+        for tag_pattern in [
+            r'<meta[^>]*og:image[^>]*/?>',
+            r'<meta[^>]*twitter:image[^>]*/?>',
+        ]:
+            meta = re.search(tag_pattern, page, re.IGNORECASE)
+            if meta:
+                content = re.search(
+                    r'content=["\']([^"\']+)["\']', meta.group(), re.IGNORECASE
+                )
+                if content:
+                    img_url = content.group(1).strip()
+                    # Make relative URLs absolute
+                    if img_url and not img_url.startswith("http"):
+                        img_url = urljoin(article_url, img_url)
+                    if img_url:
+                        return img_url
+
+        print(f"  og:image not found on page: {article_url[:70]}")
     except Exception as e:
-        print(f"Warning: og:image fetch failed for {url}: {e}")
+        print(f"  og:image fetch error ({article_url[:60]}): {e}")
     return ""
 
 
 def _fetch_source(url: str, name: str, limit: int) -> list[dict]:
-    """Fetch and parse a single RSS feed, returning up to `limit` articles."""
     try:
         feed = feedparser.parse(url)
         articles = []
@@ -89,17 +103,36 @@ def _fetch_source(url: str, name: str, limit: int) -> list[dict]:
 
 
 def fetch_all_news() -> dict[str, list[dict]]:
-    """Return a dict keyed by section with lists of article dicts."""
     results = {}
     for section, sources in NEWS_SOURCES.items():
         articles = []
         for src in sources:
             articles.extend(_fetch_source(src["url"], src["name"], ARTICLES_PER_SOURCE))
 
-        # Guarantee the lead article (index 0) has an image via og:image scraping
-        if articles and not articles[0]["image"]:
-            print(f"Fetching og:image for lead article in [{section}]: {articles[0]['title'][:60]}")
-            articles[0]["image"] = _fetch_og_image(articles[0]["link"])
+        # Find an image for the lead article — try up to 3 articles per section
+        image_found = False
+        for i, article in enumerate(articles[:3]):
+            if article["image"]:
+                print(f"  [{section}] RSS image found on article {i}: {article['image'][:70]}")
+                # Move image-bearing article to front if it's not already there
+                if i > 0:
+                    articles[0]["image"] = article["image"]
+                image_found = True
+                break
+
+        if not image_found:
+            # Fall back to og:image scraping for first 3 articles
+            for i, article in enumerate(articles[:3]):
+                print(f"  [{section}] Trying og:image for article {i}: {article['title'][:55]}")
+                img = _fetch_og_image(article["link"])
+                if img:
+                    articles[0]["image"] = img
+                    print(f"  [{section}] og:image SUCCESS: {img[:70]}")
+                    image_found = True
+                    break
+
+        if not image_found:
+            print(f"  [{section}] WARNING: No image found for any lead article")
 
         results[section] = articles
     return results
