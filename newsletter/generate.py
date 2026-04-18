@@ -87,38 +87,38 @@ def _quick_bites_card(items: list[str]) -> str:
 
 
 def _build_prompt(articles_text: str, date_str: str) -> str:
-    return f"""Bạn đang viết một bản tin email hàng ngày theo phong cách Morning Brew — thông minh, hóm hỉnh, thân thiện và hữu ích. Đối tượng độc giả là người Việt Nam muốn cập nhật tin tức Việt Nam và thế giới. Toàn bộ nội dung phải được viết bằng tiếng Việt.
+    return f"""Viết một bản tin sáng thật tự nhiên và sinh động cho độc giả Việt Nam. Giọng văn nên thân thiện, dí dỏm, hẹp gọn nhưng đầy đủ thông tin — giống cách bạn kể chuyện cho bạn thân. Tránh ngôn từ quá cứng nhắc hay dịch máy. Tập trung vào Việt Nam và tin tức thế giới, bỏ qua những nội dung quá Mỹ-centric.
 
-Ngày hôm nay: {date_str}
+Hôm nay: {date_str}
 
-Các bài báo:
+Các bài viết mới:
 {articles_text}
 
-Trả về một đối tượng JSON hợp lệ duy nhất với cấu trúc chính xác sau (dùng dấu nháy đơn bên trong giá trị thuộc tính HTML để không phá vỡ JSON):
+Trả về JSON với cấu trúc này (nhớ dùng dấu nháy đơn cho HTML attributes):
 
 {{
   "opener": {{
     "emoji": "🌿",
-    "label": "BẠN CÓ BIẾT?",
-    "text": "Một câu vui vẻ, thú vị hoặc đáng yêu. Chọn tự do từ: một sự thật thú vị về thế giới, một sự kiện 'ngày này trong lịch sử', một nhận xét hóm hỉnh về ngày trong tuần, một câu trích dẫn truyền cảm hứng ngắn, hoặc điều gì đó thú vị. Làm độc giả mỉm cười."
+    "label": "ĐIỀU THÚ VỊ",
+    "text": "Một câu nhẹ nhàng mở đầu ngày. Có thể là sự kiện lịch sử ngày hôm nay, sự thật thế giới bất ngờ, hoặc chỉ một nhận xét hóm hỉnh về thứ trong tuần. Mục tiêu là làm độc giả mỉm cười."
   }},
-  "intro": "<p style='font-size:16px;line-height:1.7;color:#333;'>Lời chào buổi sáng thân thiện 2-3 câu ở đây.</p>",
+  "intro": "<p style='font-size:16px;line-height:1.7;color:#333;'>Lời chào sáng 2-3 câu, thân thiện và tự nhiên.</p>",
   "sections": {{
-    "vietnam":  {{"headline": "Tiêu đề viết lại súc tích", "body": "<p>Tin chính 3-4 đoạn ~300 từ kèm gạch đầu dòng cho các sự kiện quan trọng.</p><p>Tin phụ 1-2 đoạn.</p>"}},
-    "global":   {{"headline": "Tiêu đề viết lại súc tích", "body": "<p>...</p>"}},
-    "tech":     {{"headline": "Tiêu đề viết lại súc tích", "body": "<p>...</p>"}},
-    "business": {{"headline": "Tiêu đề viết lại súc tích", "body": "<p>...</p>"}}
+    "vietnam":  {{"headline": "Tiêu đề hấp dẫn, ngắn gọn", "body": "<p>Đoạn tin chính có 3-4 câu, khoảng 300 từ, nêu rõ những điểm chính. Dùng bullet points cho các sự kiện quan trọng.</p><p>Nếu có tin phụ khác liên quan, thêm 1-2 đoạn nữa.</p>"}},
+    "global":   {{"headline": "Tiêu đề ngắn gọn", "body": "<p>...</p>"}},
+    "tech":     {{"headline": "Tiêu đề hấp dẫn", "body": "<p>...</p>"}},
+    "business": {{"headline": "Tiêu đề thu hút", "body": "<p>...</p>"}}
   }},
-  "quick_bites": ["Tin ngắn 1 câu 1.", "Tin ngắn 1 câu 2.", "Tin ngắn 1 câu 3.", "Tin ngắn 1 câu 4."],
-  "signoff": "Lời tạm biệt hai câu."
+  "quick_bites": ["Tin 1 dòng.", "Tin 1 dòng.", "Tin 1 dòng.", "Tin 1 dòng."],
+  "signoff": "Lời tạm biệt 2 câu, tự nhiên."
 }}
 
-Quy tắc:
-- Tin chính mỗi mục: 3-4 đoạn (~300 từ), dùng <ul><li> cho các sự kiện chính
-- Tin phụ: 1-2 đoạn mỗi tin (~100 từ)
-- Tất cả HTML bên trong chuỗi JSON phải dùng dấu nháy đơn cho thuộc tính
-- Chỉ xuất ra đối tượng JSON — không markdown, không giải thích, không có gì khác
-- Toàn bộ văn bản phải bằng tiếng Việt
+Hướng dẫn:
+- Viết tất cả bằng tiếng Việt tự nhiên, không dịch máy
+- Mỗi tiêu đề: súc tích, thu hút, gợi tò mò
+- Mỗi đoạn tin: bắt đầu bằng câu nóng nhất, sau đó giải thích chi tiết
+- Quick bites: các sự kiện nhỏ gọn, 1 câu mỗi cái
+- Chỉ gửi JSON, không có markdown hay giải thích thêm
 """
 
 
