@@ -13,8 +13,9 @@ def send_newsletter(html_content: str) -> None:
     if not gmail_user or not gmail_password:
         raise ValueError("GMAIL_USER and GMAIL_APP_PASSWORD environment variables must be set")
 
-    date_str = datetime.now().strftime("%B %d, %Y")
-    subject = f"☀️ Your Daily Brew — {date_str}"
+    now = datetime.now()
+    date_str = f"ngày {now.day} tháng {now.month} năm {now.year}"
+    subject = f"☀️ Bản Tin Hàng Ngày — {date_str}"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject

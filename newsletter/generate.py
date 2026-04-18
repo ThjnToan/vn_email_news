@@ -6,11 +6,16 @@ import anthropic
 from config import CLAUDE_MODEL
 
 SECTIONS = [
-    ("vietnam",  "VIETNAM TODAY"),
-    ("global",   "WORLD WATCH"),
-    ("tech",     "TECH & SCIENCE"),
-    ("business", "MARKETS & BUSINESS"),
+    ("vietnam",  "VIỆT NAM HÔM NAY"),
+    ("global",   "THẾ GIỚI XUNG QUANH"),
+    ("tech",     "CÔNG NGHỆ & KHOA HỌC"),
+    ("business", "THỊ TRƯỜNG & KINH DOANH"),
 ]
+
+
+def _vietnamese_date(dt: datetime) -> str:
+    days_vi = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
+    return f"{days_vi[dt.weekday()]}, ngày {dt.day} tháng {dt.month} năm {dt.year}"
 
 
 def _format_articles_for_prompt(news: dict[str, list[dict]]) -> str:
@@ -60,7 +65,7 @@ def _section_card(label: str, image_url: str, headline: str, body: str) -> str:
 
 def _opener_card(opener: dict) -> str:
     emoji = opener.get("emoji", "☀️")
-    label = opener.get("label", "GOOD MORNING")
+    label = opener.get("label", "CHÀO BUỔI SÁNG")
     text = opener.get("text", "")
     return f"""<div style="background:#FFFBEA;border-left:4px solid #F5A623;border-radius:8px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:flex-start;gap:14px;">
   <span style="font-size:36px;line-height:1;flex-shrink:0;">{emoji}</span>
@@ -76,43 +81,44 @@ def _quick_bites_card(items: list[str]) -> str:
         f'<li style="margin-bottom:8px;">{item}</li>' for item in items
     )
     return f"""<div style="border:1px solid #e8e8e8;border-radius:8px;padding:24px;margin-bottom:20px;">
-  <p style="font-size:11px;font-weight:700;color:#1a73e8;letter-spacing:2px;text-transform:uppercase;margin:0 0 12px 0;">QUICK BITES</p>
+  <p style="font-size:11px;font-weight:700;color:#1a73e8;letter-spacing:2px;text-transform:uppercase;margin:0 0 12px 0;">TIN NHANH</p>
   <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;color:#333;font-family:Georgia,serif;">{lis}</ul>
 </div>"""
 
 
 def _build_prompt(articles_text: str, date_str: str) -> str:
-    return f"""You are writing a daily email newsletter in the style of Morning Brew — smart, witty, conversational, and informative. The audience is a Vietnamese reader who wants Vietnam and global news without USA-centric filler.
+    return f"""Bạn đang viết một bản tin email hàng ngày theo phong cách Morning Brew — thông minh, hóm hỉnh, thân thiện và hữu ích. Đối tượng độc giả là người Việt Nam muốn cập nhật tin tức Việt Nam và thế giới. Toàn bộ nội dung phải được viết bằng tiếng Việt.
 
-Today's date: {date_str}
+Ngày hôm nay: {date_str}
 
-News articles:
+Các bài báo:
 {articles_text}
 
-Return a single valid JSON object with this exact structure (use single quotes inside HTML attribute values to avoid breaking JSON):
+Trả về một đối tượng JSON hợp lệ duy nhất với cấu trúc chính xác sau (dùng dấu nháy đơn bên trong giá trị thuộc tính HTML để không phá vỡ JSON):
 
 {{
   "opener": {{
     "emoji": "🌿",
-    "label": "DID YOU KNOW?",
-    "text": "One cheerful, surprising, or delightful sentence. Pick freely from: a fun world fact, an 'on this day in history' moment, a witty observation about today's day of the week, a short uplifting quote, or something whimsical. Make the reader smile."
+    "label": "BẠN CÓ BIẾT?",
+    "text": "Một câu vui vẻ, thú vị hoặc đáng yêu. Chọn tự do từ: một sự thật thú vị về thế giới, một sự kiện 'ngày này trong lịch sử', một nhận xét hóm hỉnh về ngày trong tuần, một câu trích dẫn truyền cảm hứng ngắn, hoặc điều gì đó thú vị. Làm độc giả mỉm cười."
   }},
-  "intro": "<p style='font-size:16px;line-height:1.7;color:#333;'>2-3 sentence friendly Good Morning intro here.</p>",
+  "intro": "<p style='font-size:16px;line-height:1.7;color:#333;'>Lời chào buổi sáng thân thiện 2-3 câu ở đây.</p>",
   "sections": {{
-    "vietnam":  {{"headline": "Punchy rewritten headline", "body": "<p>Lead story 3-4 paragraphs ~300 words with bullet points for key facts.</p><p>Supporting story 1-2 paragraphs.</p>"}},
-    "global":   {{"headline": "Punchy rewritten headline", "body": "<p>...</p>"}},
-    "tech":     {{"headline": "Punchy rewritten headline", "body": "<p>...</p>"}},
-    "business": {{"headline": "Punchy rewritten headline", "body": "<p>...</p>"}}
+    "vietnam":  {{"headline": "Tiêu đề viết lại súc tích", "body": "<p>Tin chính 3-4 đoạn ~300 từ kèm gạch đầu dòng cho các sự kiện quan trọng.</p><p>Tin phụ 1-2 đoạn.</p>"}},
+    "global":   {{"headline": "Tiêu đề viết lại súc tích", "body": "<p>...</p>"}},
+    "tech":     {{"headline": "Tiêu đề viết lại súc tích", "body": "<p>...</p>"}},
+    "business": {{"headline": "Tiêu đề viết lại súc tích", "body": "<p>...</p>"}}
   }},
-  "quick_bites": ["One-sentence bullet 1.", "One-sentence bullet 2.", "One-sentence bullet 3.", "One-sentence bullet 4."],
-  "signoff": "Two-sentence sign-off."
+  "quick_bites": ["Tin ngắn 1 câu 1.", "Tin ngắn 1 câu 2.", "Tin ngắn 1 câu 3.", "Tin ngắn 1 câu 4."],
+  "signoff": "Lời tạm biệt hai câu."
 }}
 
-Rules:
-- Lead story per section: 3-4 paragraphs (~300 words), use <ul><li> for key facts
-- Supporting stories: 1-2 paragraphs each (~100 words)
-- All HTML inside JSON strings must use single-quoted attributes
-- Output ONLY the JSON object — no markdown, no explanation, nothing else
+Quy tắc:
+- Tin chính mỗi mục: 3-4 đoạn (~300 từ), dùng <ul><li> cho các sự kiện chính
+- Tin phụ: 1-2 đoạn mỗi tin (~100 từ)
+- Tất cả HTML bên trong chuỗi JSON phải dùng dấu nháy đơn cho thuộc tính
+- Chỉ xuất ra đối tượng JSON — không markdown, không giải thích, không có gì khác
+- Toàn bộ văn bản phải bằng tiếng Việt
 """
 
 
@@ -131,7 +137,7 @@ def generate_newsletter(news: dict[str, list[dict]]) -> str:
         print(f"  [{key}]: {img[:80] if img else '(none)'}")
 
     client = anthropic.Anthropic(api_key=api_key)
-    date_str = datetime.now().strftime("%A, %B %d, %Y")
+    date_str = _vietnamese_date(datetime.now())
     articles_text = _format_articles_for_prompt(news)
     prompt = _build_prompt(articles_text, date_str)
 
@@ -166,23 +172,23 @@ def generate_newsletter(news: dict[str, list[dict]]) -> str:
     body_html = opener_html + intro_html + sections_html + quick_html + signoff_html
 
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Daily Brew — {date_str}</title>
+  <title>Bản Tin Hàng Ngày — {date_str}</title>
 </head>
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
   <div style="max-width:600px;margin:30px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
     <div style="background:#1a73e8;padding:24px 28px;">
-      <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">&#9728;&#65039; Your Daily Brew</h1>
-      <p style="margin:6px 0 0;color:#d0e4ff;font-size:13px;">{date_str} &nbsp;&middot;&nbsp; Vietnam &amp; World Edition</p>
+      <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">&#9728;&#65039; Bản Tin Hàng Ngày</h1>
+      <p style="margin:6px 0 0;color:#d0e4ff;font-size:13px;">{date_str} &nbsp;&middot;&nbsp; Phiên bản Việt Nam &amp; Thế giới</p>
     </div>
     <div style="padding:24px 28px;">
       {body_html}
     </div>
     <div style="background:#f5f5f5;padding:16px 28px;text-align:center;font-size:12px;color:#999;">
-      Your personalized daily newsletter &nbsp;&middot;&nbsp; Vietnam &amp; Global News
+      Bản tin cá nhân hàng ngày &nbsp;&middot;&nbsp; Tin tức Việt Nam &amp; Quốc tế
     </div>
   </div>
 </body>

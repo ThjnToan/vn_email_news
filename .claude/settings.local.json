@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init)",
+      "Bash(git add main.py config.py requirements.txt newsletter/ .github/)",
+      "Bash(git remote set-url origin https://github.com/ThjnToan/vn_email_news.git)",
+      "Bash(git branch -M main)",
+      "Bash(git push -u origin main)",
+      "Bash(git add requirements.txt config.py newsletter/generate.py .github/workflows/daily_newsletter.yml)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git add newsletter/fetch_news.py newsletter/generate.py config.py)",
+      "Bash(git add newsletter/fetch_news.py)",
+      "Bash(git add newsletter/generate.py)",
+      "Bash(git add newsletter/fetch_news.py debug_newsletter.py)",
+      "Bash(git add main.py)",
+      "Bash(git add config.py newsletter/send_email.py newsletter/generate.py)"
+    ]
+  }
+}
