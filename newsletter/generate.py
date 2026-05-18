@@ -6,6 +6,10 @@ from datetime import datetime
 import anthropic
 from config import CLAUDE_MODEL
 
+# Vietnamese-safe font stack: Arial renders Vietnamese diacritics correctly on all systems
+_FONT = "font-family:Arial,'Helvetica Neue',Helvetica,sans-serif"
+_FONT_SERIF = "font-family:Georgia,'Times New Roman',Times,serif"
+
 SECTIONS = [
     ("vietnam",  "VIỆT NAM", "#dc2626", "🇻🇳"),
     ("global",   "THẾ GIỚI", "#2563eb", "🌍"),
@@ -56,8 +60,8 @@ def _header(date_str: str) -> str:
     return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:0 0 16px 16px;">
   <tr><td style="padding:32px 24px 28px;text-align:center;">
     <div style="font-size:36px;margin-bottom:8px;">☀️</div>
-    <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Bản Tin Hàng Ngày</h1>
-    <p style="margin:8px 0 0;color:#94a3b8;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{date_str} · Phiên bản Việt Nam &amp; Thế giới</p>
+    <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:-0.5px;{_FONT};">Bản Tin Hàng Ngày</h1>
+    <p style="margin:8px 0 0;color:#94a3b8;font-size:14px;{_FONT};">{date_str} · Phiên bản Việt Nam &amp; Thế giới</p>
   </td></tr>
 </table>"""
 
@@ -67,7 +71,7 @@ def _weather_bar(weather_text: str) -> str:
         return ""
     return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;">
   <tr><td style="background:#f0f9ff;border-radius:12px;padding:14px 20px;text-align:center;">
-    <p style="margin:0;color:#0369a1;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">🌤️ <strong>Thời tiết hôm nay:</strong> {weather_text}</p>
+    <p style="margin:0;color:#0369a1;font-size:13px;{_FONT};">🌤️ <strong>Thời tiết hôm nay:</strong> {weather_text}</p>
   </td></tr>
 </table>"""
 
@@ -81,8 +85,8 @@ def _opener_card(opener: dict) -> str:
     <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
       <td width="40" valign="top" style="font-size:32px;line-height:1;">{emoji}</td>
       <td valign="top">
-        <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#b45309;letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{label}</p>
-        <p style="margin:0;font-size:15px;line-height:1.7;color:#78350f;font-family:Georgia,'Times New Roman',serif;">{text}</p>
+        <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#b45309;letter-spacing:1.5px;text-transform:uppercase;{_FONT};">{label}</p>
+        <p style="margin:0;font-size:15px;line-height:1.7;color:#78350f;{_FONT_SERIF};">{text}</p>
       </td>
     </tr></table>
   </td></tr>
@@ -92,7 +96,7 @@ def _opener_card(opener: dict) -> str:
 def _intro_block(intro: str) -> str:
     return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
   <tr><td style="padding:0 4px;">
-    <div style="font-size:16px;line-height:1.8;color:#334155;font-family:Georgia,'Times New Roman',serif;">{intro}</div>
+    <div style="font-size:16px;line-height:1.8;color:#334155;{_FONT_SERIF};">{intro}</div>
   </td></tr>
 </table>"""
 
@@ -100,8 +104,9 @@ def _intro_block(intro: str) -> str:
 def _section_card(key: str, label: str, accent: str, icon: str, image_url: str, headline: str, body: str) -> str:
     img_block = ""
     if image_url:
+        # max-width + height:auto preserves aspect ratio and prevents blur
         img_block = f"""<tr><td style="padding:0 0 16px;">
-      <img src="{image_url}" alt="" style="width:100%;height:200px;object-fit:cover;border-radius:8px;display:block;" />
+      <img src="{image_url}" alt="{headline[:80]}" style="max-width:100%;height:auto;border-radius:8px;display:block;" />
     </td></tr>"""
 
     return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
@@ -109,14 +114,14 @@ def _section_card(key: str, label: str, accent: str, icon: str, image_url: str, 
     <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
       <td style="font-size:20px;padding-right:8px;">{icon}</td>
       <td>
-        <p style="margin:0;font-size:11px;font-weight:700;color:{accent};letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{label}</p>
+        <p style="margin:0;font-size:11px;font-weight:700;color:{accent};letter-spacing:1.5px;text-transform:uppercase;{_FONT};">{label}</p>
       </td>
     </tr></table>
   </td></tr>
   {img_block}
   <tr><td style="padding:0 24px 20px;">
-    <h2 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:-0.3px;">{headline}</h2>
-    <div style="font-size:15px;line-height:1.75;color:#475569;font-family:Georgia,'Times New Roman',serif;">{body}</div>
+    <h2 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#0f172a;{_FONT};letter-spacing:-0.3px;">{headline}</h2>
+    <div style="font-size:15px;line-height:1.75;color:#475569;{_FONT_SERIF};">{body}</div>
   </td></tr>
 </table>"""
 
@@ -128,12 +133,12 @@ def _numbers_card(items: list[str]) -> str:
     for item in items:
         cards += f"""<td style="padding:4px;">
           <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-radius:10px;padding:16px 12px;text-align:center;border:1px solid #bfdbfe;">
-            <p style="margin:0;font-size:13px;line-height:1.5;color:#1e40af;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-weight:600;">{item}</p>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:#1e40af;{_FONT};font-weight:600;">{item}</p>
           </div>
         </td>"""
     return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
   <tr><td style="padding:0 0 12px;">
-    <p style="margin:0;font-size:11px;font-weight:700;color:#475569;letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">📊 CON SỐ ĐÁNG CHÚ Ý</p>
+    <p style="margin:0;font-size:11px;font-weight:700;color:#475569;letter-spacing:1.5px;text-transform:uppercase;{_FONT};">📊 CON SỐ ĐÁNG CHÚ Ý</p>
   </td></tr>
   <tr><td>
     <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>{cards}</tr></table>
@@ -148,14 +153,14 @@ def _quick_bites_card(items: list[str]) -> str:
         f"""<tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
           <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
             <td width="24" valign="top" style="color:#f59e0b;font-size:14px;">⚡</td>
-            <td valign="top" style="font-size:14px;line-height:1.6;color:#475569;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{item}</td>
+            <td valign="top" style="font-size:14px;line-height:1.6;color:#475569;{_FONT};">{item}</td>
           </tr></table>
         </td></tr>"""
         for item in items
     )
     return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
   <tr><td style="padding:20px 24px 16px;border-bottom:1px solid #e2e8f0;">
-    <p style="margin:0;font-size:11px;font-weight:700;color:#475569;letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">⚡ TIN NHANH</p>
+    <p style="margin:0;font-size:11px;font-weight:700;color:#475569;letter-spacing:1.5px;text-transform:uppercase;{_FONT};">⚡ TIN NHANH</p>
   </td></tr>
   <tr><td style="padding:0 24px 12px;">
     <table width="100%" cellpadding="0" cellspacing="0" border="0">{lis}</table>
@@ -166,16 +171,16 @@ def _quick_bites_card(items: list[str]) -> str:
 def _signoff_block(signoff: str) -> str:
     return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
   <tr><td style="border-top:1px solid #e2e8f0;padding:20px 0 0;">
-    <p style="margin:0;font-size:15px;line-height:1.7;color:#64748b;font-family:Georgia,'Times New Roman',serif;font-style:italic;text-align:center;">{signoff}</p>
+    <p style="margin:0;font-size:15px;line-height:1.7;color:#64748b;{_FONT_SERIF};font-style:italic;text-align:center;">{signoff}</p>
   </td></tr>
 </table>"""
 
 
 def _footer() -> str:
-    return """<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;border-radius:12px 12px 0 0;margin-top:8px;">
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;border-radius:12px 12px 0 0;margin-top:8px;">
   <tr><td style="padding:24px;text-align:center;">
-    <p style="margin:0 0 8px;font-size:13px;color:#64748b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Bản tin cá nhân hàng ngày · Tin tức Việt Nam &amp; Quốc tế</p>
-    <p style="margin:0;font-size:12px;color:#94a3b8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Gửi từ 🤖 với 💙</p>
+    <p style="margin:0 0 8px;font-size:13px;color:#64748b;{_FONT};">Bản tin cá nhân hàng ngày · Tin tức Việt Nam &amp; Thế giới</p>
+    <p style="margin:0;font-size:12px;color:#94a3b8;{_FONT};">Gửi từ 🤖 với 💙</p>
   </td></tr>
 </table>"""
 
@@ -249,12 +254,12 @@ def _fallback_html(news: dict[str, list[dict]], date_str: str) -> str:
             f'<li style="margin-bottom:12px;font-size:15px;line-height:1.6;"><a href="{a["link"]}" style="color:{accent};text-decoration:none;font-weight:600;">{a["title"]}</a><br><span style="font-size:13px;color:#64748b;">{a["source"]}</span></li>'
             for a in articles
         )
-        body += f'<h2 style="color:{accent};font-size:18px;margin:24px 0 12px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">{icon} {label}</h2><ul style="padding-left:20px;margin:0;">{items}</ul>'
+        body += f'<h2 style="color:{accent};font-size:18px;margin:24px 0 12px;{_FONT};">{icon} {label}</h2><ul style="padding-left:20px;margin:0;">{items}</ul>'
 
     return f"""<!DOCTYPE html>
 <html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Bản Tin Hàng Ngày — {date_str}</title></head>
-<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:#f8fafc;{_FONT};">
 <div style="max-width:600px;margin:0 auto;background:#ffffff;">
 {_header(date_str)}
 <div style="padding:24px;">
@@ -343,7 +348,6 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
         text = _plain_text(news, {}, {}, [], "", date_str, weather_text)
         return html, text
 
-    # Build full HTML
     sections_html = ""
     for key, label, accent, icon in SECTIONS:
         sec = sections_data.get(key, {})
@@ -368,7 +372,7 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bản Tin Hàng Ngày — {date_str}</title>
 </head>
-<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:#f8fafc;{_FONT};">
   <div style="max-width:600px;margin:0 auto;background:#ffffff;">
     {_header(date_str)}
     <div style="padding:24px;">

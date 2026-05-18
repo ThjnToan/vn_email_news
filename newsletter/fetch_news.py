@@ -23,24 +23,41 @@ def _clean_text(text: str) -> str:
     return " ".join(text.split()).strip()
 
 
+def _enhance_image_url(url: str) -> str:
+    """Upgrade thumbnail URLs to larger sizes from known sources."""
+    if not url:
+        return url
+    # BBC: /240/ or /320/ -> /800/
+    if "ichef.bbci.co.uk" in url:
+        url = re.sub(r"/ace/standard/\d+(/|/cpsprodpb)", r"/ace/standard/800\1", url)
+        url = re.sub(r"/\d+/cpsprodpb", "/800/cpsprodpb", url)
+    # VnExpress: try larger size
+    if "vcdn1-english.vnecdn.net" in url or "vcdn-vnexpress.vnecdn.net" in url:
+        url = re.sub(r"-(\d+)-(\d+)-(\d+)-(\d+)", r"-800-0-\3-\4", url)
+    # The Guardian: use larger crop
+    if "i.guim.co.uk" in url:
+        url = re.sub(r"&width=\d+", "&width=800", url)
+    return url
+
+
 def _extract_rss_image(entry) -> str:
     for m in entry.get("media_content", []):
         url = m.get("url", "")
         if url:
-            return url
+            return _enhance_image_url(url)
     for m in entry.get("media_thumbnail", []):
         url = m.get("url", "")
         if url:
-            return url
+            return _enhance_image_url(url)
     for enc in entry.get("enclosures", []):
         if enc.get("type", "").startswith("image/"):
-            return enc.get("href", enc.get("url", ""))
+            return _enhance_image_url(enc.get("href", enc.get("url", "")))
     raw = entry.get("summary", "") or ""
     if not raw and entry.get("content"):
         raw = entry["content"][0].get("value", "")
     m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', raw)
     if m:
-        return m.group(1)
+        return _enhance_image_url(m.group(1))
     return ""
 
 
@@ -64,7 +81,7 @@ def _fetch_og_image(article_url: str) -> str:
                     if img_url and not img_url.startswith("http"):
                         img_url = urljoin(article_url, img_url)
                     if img_url:
-                        return img_url
+                        return _enhance_image_url(img_url)
     except Exception:
         pass
     return ""
