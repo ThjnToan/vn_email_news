@@ -14,7 +14,7 @@ def _fetch_weather() -> str:
     parts = []
     for city in WEATHER_CITIES:
         try:
-            url = f"https://wttr.in/{city}?format=%C+%t+%h&lang=vi"
+            url = f"https://wttr.in/{city}?m&format=%C+%t+%h&lang=vi"
             r = requests.get(url, timeout=8,
                             headers={"User-Agent": "curl/8.0"})
             if r.status_code == 200:
