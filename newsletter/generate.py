@@ -6,7 +6,6 @@ from datetime import datetime
 import anthropic
 from config import CLAUDE_MODEL
 
-# Vietnamese-safe font stack: Arial renders Vietnamese diacritics correctly on all systems
 _FONT = "font-family:Arial,'Helvetica Neue',Helvetica,sans-serif"
 _FONT_SERIF = "font-family:Georgia,'Times New Roman',Times,serif"
 
@@ -32,27 +31,51 @@ def _format_articles_for_prompt(news: dict[str, list[dict]]) -> str:
         articles = news.get(key, [])
         lines.append(f"\n=== {label} ===")
         for i, a in enumerate(articles, 1):
-            img = a.get("image", "")
-            img_tag = f" [image: {img[:80]}]" if img else ""
-            lines.append(f"{i}. [{a['source']}]{img_tag} {a['title']}")
+            lines.append(f"{i}. [{a['source']}] {a['title']}")
             if a["summary"]:
                 lines.append(f"   Summary: {a['summary']}")
     return "\n".join(lines)
 
 
-def _parse_response(text: str) -> dict:
+def _extract_json(text: str) -> dict:
+    """Aggressively extract a JSON object from Claude's output."""
     text = text.strip()
-    text = re.sub(r"^```(?:json)?\s*\n?", "", text)
-    text = re.sub(r"\n?```\s*$", "", text)
+
+    # Remove markdown code fences
+    text = re.sub(r"^```(?:json)?\s*\n?", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\n?```\s*$", "", text, flags=re.IGNORECASE)
+    text = text.strip()
+
+    # Strategy 1: direct parse
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        m = re.search(r"\{.*\}", text, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group())
-            except json.JSONDecodeError:
-                pass
+        pass
+
+    # Strategy 2: find outermost braces and parse
+    depth = 0
+    start = -1
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start != -1:
+                try:
+                    return json.loads(text[start:i+1])
+                except json.JSONDecodeError:
+                    pass
+
+    # Strategy 3: regex grab
+    m = re.search(r"\{[\s\S]*?\}", text)
+    if m:
+        try:
+            return json.loads(m.group())
+        except json.JSONDecodeError:
+            pass
+
     return {}
 
 
@@ -104,7 +127,6 @@ def _intro_block(intro: str) -> str:
 def _section_card(key: str, label: str, accent: str, icon: str, image_url: str, headline: str, body: str) -> str:
     img_block = ""
     if image_url:
-        # max-width + height:auto preserves aspect ratio and prevents blur
         img_block = f"""<tr><td style="padding:0 0 16px;">
       <img src="{image_url}" alt="{headline[:80]}" style="max-width:100%;height:auto;border-radius:8px;display:block;" />
     </td></tr>"""
@@ -186,42 +208,48 @@ def _footer() -> str:
 
 
 def _build_prompt(articles_text: str, date_str: str, weather_text: str) -> str:
-    weather_block = f"\nThời tiết hôm nay: {weather_text}\n" if weather_text else ""
-    return f"""Viết một bản tin sáng thật tự nhiên và sinh động cho độc giả Việt Nam. Giọng văn nên thân thiện, dí dỏm, gọn nhưng đầy đủ thông tin — giống cách bạn kể chuyện cho bạn thân. Tránh ngôn từ quá cứng nhắc hay dịch máy. Tập trung vào Việt Nam và tin tức thế giới, bỏ qua những nội dung quá Mỹ-centric.
+    weather_block = f"Thời tiết hôm nay: {weather_text}\n" if weather_text else ""
+    return f"""Bạn là biên tập viên bản tin sáng cho độc giả Việt Nam. Nhiệm vụ của bạn là viết một bản tin ngắn gọn, thân thiện, dí dỏm — giống cách kể chuyện cho bạn thân. Giọng văn tự nhiên, không dịch máy. Tập trung vào Việt Nam và tin tức thế giới, bỏ qua nội dung quá Mỹ-centric.
 
 Hôm nay: {date_str}
 {weather_block}
-Các bài viết mới:
+Dưới đây là các bài báo mới nhất. Dựa vào đây, hãy viết bản tin:
 {articles_text}
 
-Trả về JSON với cấu trúc này (dùng dấu nháy đơn cho HTML attributes):
+---
+QUAN TRỌNG: Chỉ trả về một đối tượng JSON duy nhất. KHÔNG thêm văn bản giải thích, KHÔNG dùng markdown code fence, KHÔNG thêm comment.
+
+Cấu trúc JSON (các key phải nằm trong dấu nháy kép):
 
 {{
   "opener": {{
     "emoji": "🌿",
     "label": "ĐIỀU THÚ VỊ",
-    "text": "Một câu nhẹ nhàng mở đầu ngày. Có thể là sự kiện lịch sử ngày hôm nay, sự thật thế giới bất ngờ, hoặc chỉ một nhận xét hóm hỉnh về thứ trong tuần."
+    "text": "Một câu mở đầu ngày nhẹ nhàng, hóm hỉnh."
   }},
   "intro": "<p>Lời chào sáng 2-3 câu, thân thiện và tự nhiên.</p>",
   "sections": {{
-    "vietnam":  {{"headline": "Tiêu đề hấp dẫn, ngắn gọn", "body": "<p>Đoạn tin chính 3-4 câu, nêu rõ điểm chính. Dùng bullet points cho sự kiện quan trọng.</p><p>Nếu có tin phụ, thêm 1-2 đoạn nữa.</p>"}},
-    "global":   {{"headline": "Tiêu đề ngắn gọn", "body": "<p>...</p>"}},
-    "tech":     {{"headline": "Tiêu đề hấp dẫn", "body": "<p>...</p>"}},
-    "business": {{"headline": "Tiêu đề thu hút", "body": "<p>...</p>"}}
+    "vietnam":  {{
+      "headline": "Tiêu đề hấp dẫn, ngắn gọn",
+      "body": "<p>Đoạn tin chính 3-4 câu, nêu rõ điểm chính. Dùng bullet points &lt;ul&gt;&lt;li&gt;...&lt;/li&gt;&lt;/ul&gt; cho sự kiện quan trọng.</p><p>Nếu có tin phụ liên quan, thêm 1-2 đoạn nữa.</p>"
+    }},
+    "global":   {{"headline": "...", "body": "<p>...</p>"}},
+    "tech":     {{"headline": "...", "body": "<p>...</p>"}},
+    "business": {{"headline": "...", "body": "<p>...</p>"}}
   }},
-  "numbers": ["GDP Việt Nam tăng 8.2%", "Giá dầu 110 USD/thùng", "3 con số ấn tượng"],
+  "numbers": ["Số liệu 1", "Số liệu 2", "Số liệu 3"],
   "quick_bites": ["Tin 1 dòng.", "Tin 1 dòng.", "Tin 1 dòng.", "Tin 1 dòng."],
   "signoff": "Lời tạm biệt 2 câu, tự nhiên."
 }}
 
-Hướng dẫn:
-- Viết tất cả bằng tiếng Việt tự nhiên, không dịch máy
-- Mỗi tiêu đề: súc tích, thu hút, gợi tò mò
+Quy tắc:
+- Viết toàn bộ bằng tiếng Việt tự nhiên
+- Mỗi tiêu đề section: súc tích, thu hút, gợi tò mò
 - Mỗi đoạn tin: bắt đầu bằng câu nóng nhất, sau đó giải thích
-- body chỉ cần đoạn văn và bullet points, KHÔNG cần nhúng ảnh (ảnh đã được thêm ở ngoài)
-- "numbers": 3-4 số liệu ấn tượng nhất từ các bài báo, mỗi cái 1 dòng ngắn
-- Quick bites: các sự kiện nhỏ gọn, 1 câu mỗi cái
-- Chỉ gửi JSON, không có markdown hay giải thích thêm
+- body chỉ cần đoạn văn + bullet points, KHÔNG nhúng ảnh
+- "numbers": 3-4 con số ấn tượng nhất từ bài báo, mỗi cái 1 dòng ngắn
+- "quick_bites": 4-5 tin ngắn, mỗi tin 1 câu
+- Chỉ gửi JSON thuần, không có markdown hay giải thích
 """
 
 
@@ -246,38 +274,97 @@ def _call_claude(client: anthropic.Anthropic, prompt: str) -> str:
     raise RuntimeError(f"Claude API failed after {_MAX_RETRIES} attempts: {last_error}")
 
 
-def _fallback_html(news: dict[str, list[dict]], date_str: str) -> str:
-    body = ""
+def _render_body(data: dict, section_images: dict, weather_text: str) -> str:
+    opener = data.get("opener", {})
+    intro = data.get("intro", "")
+    sections_data = data.get("sections", {})
+    numbers = data.get("numbers", [])
+    quick_bites = data.get("quick_bites", [])
+    signoff = data.get("signoff", "")
+
+    sections_html = ""
+    for key, label, accent, icon in SECTIONS:
+        sec = sections_data.get(key, {})
+        headline = sec.get("headline", "")
+        body = sec.get("body", "")
+        image_url = section_images.get(key, "")
+        sections_html += _section_card(key, label, accent, icon, image_url, headline, body)
+
+    return (
+        _weather_bar(weather_text)
+        + _opener_card(opener)
+        + _intro_block(intro)
+        + sections_html
+        + _numbers_card(numbers)
+        + _quick_bites_card(quick_bites)
+        + _signoff_block(signoff)
+    )
+
+
+def _fallback_body(news: dict[str, list[dict]], weather_text: str) -> str:
+    """Fallback that looks like the real newsletter using raw article data."""
+    body_parts = [_weather_bar(weather_text)]
+
+    # Opener
+    body_parts.append(_opener_card({
+        "emoji": "📰",
+        "label": "CHÀO BUỔI SÁNG",
+        "text": "Hôm nay có nhiều tin tức đáng chú ý. Dưới đây là tổng hợp nhanh từ các nguồn uy tín."
+    }))
+
+    # Intro
+    body_parts.append(_intro_block(
+        "<p>Chào buổi sáng! Đây là bản tin hàng ngày với những thông tin nóng hổi từ Việt Nam và thế giới.</p>"
+    ))
+
+    # Sections with raw articles
     for key, label, accent, icon in SECTIONS:
         articles = news.get(key, [])
-        items = "".join(
-            f'<li style="margin-bottom:12px;font-size:15px;line-height:1.6;"><a href="{a["link"]}" style="color:{accent};text-decoration:none;font-weight:600;">{a["title"]}</a><br><span style="font-size:13px;color:#64748b;">{a["source"]}</span></li>'
-            for a in articles
-        )
-        body += f'<h2 style="color:{accent};font-size:18px;margin:24px 0 12px;{_FONT};">{icon} {label}</h2><ul style="padding-left:20px;margin:0;">{items}</ul>'
+        if not articles:
+            continue
 
-    return f"""<!DOCTYPE html>
-<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Bản Tin Hàng Ngày — {date_str}</title></head>
-<body style="margin:0;padding:0;background:#f8fafc;{_FONT};">
-<div style="max-width:600px;margin:0 auto;background:#ffffff;">
-{_header(date_str)}
-<div style="padding:24px;">
-{body}
-</div>
-{_footer()}
-</div></body></html>"""
+        # Get lead image
+        image_url = ""
+        for a in articles:
+            if a.get("image"):
+                image_url = a["image"]
+                break
+
+        # Build a simple body from article summaries
+        body_parts_list = []
+        for i, a in enumerate(articles[:3]):
+            body_parts_list.append(f"<p><strong>{a['title']}</strong> — {a['summary'][:250]}</p>")
+            if i == 0 and a.get("link"):
+                body_parts_list.append(f'<p><a href="{a["link"]}" style="color:{accent};font-weight:600;">Đọc tiếp →</a></p>')
+
+        body_html = "".join(body_parts_list)
+        headline = f"Tin tức {label.lower()} nổi bật"
+        body_parts.append(_section_card(key, label, accent, icon, image_url, headline, body_html))
+
+    body_parts.append(
+        _signoff_block("Chúc bạn một ngày tốt lành và đừng quên theo dõi bản tin ngày mai nhé!")
+    )
+
+    return "".join(body_parts)
 
 
-def _plain_text(news: dict[str, list[dict]], opener: dict, sections: dict, quick_bites: list[str],
-                signoff: str, date_str: str, weather_text: str) -> str:
+def _plain_text(news: dict[str, list[dict]], data: dict, date_str: str, weather_text: str) -> str:
     lines = [f"BẢN TIN HÀNG NGÀY — {date_str}", ""]
     if weather_text:
         lines.append(f"Thời tiết: {weather_text}")
         lines.append("")
+
+    opener = data.get("opener", {})
     if opener:
         lines.append(f"{opener.get('emoji', '')} {opener.get('label', '')}: {opener.get('text', '')}")
         lines.append("")
+
+    intro = data.get("intro", "")
+    if intro:
+        lines.append(re.sub(r"<[^>]+>", "", intro))
+        lines.append("")
+
+    sections = data.get("sections", {})
     if sections:
         for key, label, _, _ in SECTIONS:
             sec = sections.get(key, {})
@@ -286,15 +373,33 @@ def _plain_text(news: dict[str, list[dict]], opener: dict, sections: dict, quick
             if h:
                 lines.append(f"▶ {label}")
                 lines.append(f"  {h}")
-                lines.append(f"  {b[:300]}")
+                lines.append(f"  {b[:350]}")
+                lines.append("")
+    else:
+        # Raw fallback plain text
+        for key, label, _, _ in SECTIONS:
+            articles = news.get(key, [])
+            if articles:
+                lines.append(f"▶ {label}")
+                for a in articles[:3]:
+                    lines.append(f"  • {a['title']}")
                 lines.append("")
 
+    quick_bites = data.get("quick_bites", [])
     if quick_bites:
         lines.append("TIN NHANH:")
         for q in quick_bites:
             lines.append(f"  • {q}")
         lines.append("")
 
+    numbers = data.get("numbers", [])
+    if numbers:
+        lines.append("CON SỐ ĐÁNG CHÚ Ý:")
+        for n in numbers:
+            lines.append(f"  • {n}")
+        lines.append("")
+
+    signoff = data.get("signoff", "")
     if signoff:
         lines.append(re.sub(r"<[^>]+>", "", signoff))
         lines.append("")
@@ -326,44 +431,34 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
     articles_text = _format_articles_for_prompt(news)
     prompt = _build_prompt(articles_text, date_str, weather_text)
 
+    raw = ""
+    data = {}
+    claude_failed = False
+
     try:
         raw = _call_claude(client, prompt)
-        data = _parse_response(raw)
+        data = _extract_json(raw)
         if not data:
-            print(f"WARNING: Failed to parse Claude JSON, using fallback. Raw:\n{raw[:300]}")
-            data = {}
+            print(f"WARNING: Could not parse JSON from Claude. Raw length={len(raw)}. Using fallback.")
+            claude_failed = True
+        else:
+            # Validate required keys
+            required = ["opener", "intro", "sections", "quick_bites", "signoff"]
+            missing = [k for k in required if k not in data]
+            if missing:
+                print(f"WARNING: Claude JSON missing keys {missing}. Using fallback.")
+                claude_failed = True
     except Exception as e:
-        print(f"WARNING: Claude generation failed ({e}), using fallback template")
-        data = {}
+        print(f"WARNING: Claude generation failed ({e}). Using fallback.")
+        claude_failed = True
 
-    opener = data.get("opener", {})
-    intro = data.get("intro", "")
-    sections_data = data.get("sections", {})
-    numbers = data.get("numbers", [])
-    quick_bites = data.get("quick_bites", [])
-    signoff = data.get("signoff", "")
-
-    if not data:
-        html = _fallback_html(news, date_str)
-        text = _plain_text(news, {}, {}, [], "", date_str, weather_text)
-        return html, text
-
-    sections_html = ""
-    for key, label, accent, icon in SECTIONS:
-        sec = sections_data.get(key, {})
-        headline = sec.get("headline", "")
-        body = sec.get("body", "")
-        image_url = section_images.get(key, "")
-        sections_html += _section_card(key, label, accent, icon, image_url, headline, body)
-
-    body_html = (
-        _opener_card(opener)
-        + _intro_block(intro)
-        + sections_html
-        + _numbers_card(numbers)
-        + _quick_bites_card(quick_bites)
-        + _signoff_block(signoff)
-    )
+    if claude_failed:
+        body_html = _fallback_body(news, weather_text)
+        # Still try to parse whatever we got for plain text
+        if not data:
+            data = {}
+    else:
+        body_html = _render_body(data, section_images, weather_text)
 
     html = f"""<!DOCTYPE html>
 <html lang="vi">
@@ -376,7 +471,6 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
   <div style="max-width:600px;margin:0 auto;background:#ffffff;">
     {_header(date_str)}
     <div style="padding:24px;">
-      {_weather_bar(weather_text)}
       {body_html}
     </div>
     {_footer()}
@@ -384,6 +478,6 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
 </body>
 </html>"""
 
-    text = _plain_text(news, opener, sections_data, quick_bites, signoff, date_str, weather_text)
+    text = _plain_text(news, data, date_str, weather_text)
 
     return html, text
