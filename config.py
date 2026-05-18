@@ -7,7 +7,7 @@ RECIPIENT_EMAILS = [
 NEWS_SOURCES = {
     "vietnam": [
         {"name": "VnExpress International", "url": "https://e.vnexpress.net/rss/news.rss"},
-        {"name": "Tuoi Tre News", "url": "https://tuoitrenews.vn/rss/news.rss"},
+        {"name": "VOV English", "url": "https://english.vov.vn/en/rss/home.rss"},
     ],
     "global": [
         {"name": "BBC World News", "url": "http://feeds.bbci.co.uk/news/world/rss.xml"},
@@ -18,7 +18,7 @@ NEWS_SOURCES = {
         {"name": "TechCrunch", "url": "https://techcrunch.com/feed/"},
     ],
     "business": [
-        {"name": "Reuters Business", "url": "https://feeds.reuters.com/reuters/businessNews"},
+        {"name": "MarketWatch Top Stories", "url": "https://feeds.marketwatch.com/marketwatch/topstories"},
         {"name": "CNBC Markets", "url": "https://www.cnbc.com/id/10001147/device/rss/rss.html"},
     ],
 }
