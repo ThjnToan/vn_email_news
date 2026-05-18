@@ -4,11 +4,23 @@ on:
   schedule:
     # 00:00 UTC = 07:00 AM Vietnam time (UTC+7)
     - cron: "0 0 * * *"
-  workflow_dispatch:  # allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   send-newsletter:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
@@ -27,4 +39,30 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NEWSLETTER_OUTPUT_DIR: ${{ github.workspace }}/_site
         run: python main.py
+
+      - name: Create archive index
+        run: |
+          cd ${{ github.workspace }}/_site
+          echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bản Tin — Lưu Trữ</title>' > index.html
+          echo '<meta name="viewport" content="width=device-width,initial-scale=1.0">' >> index.html
+          echo '<style>body{font-family:Arial,sans-serif;max-width:600px;margin:40px auto;padding:0 20px;}' >> index.html
+          echo 'h1{color:#1a73e8;}ul{list-style:none;padding:0;}li{margin:12px 0;}' >> index.html
+          echo 'a{color:#1a73e8;text-decoration:none;font-size:16px;}' >> index.html
+          echo 'a:hover{text-decoration:underline;}.date{color:#666;font-size:13px;}' >> index.html
+          echo '</style></head><body><h1>📬 Bản Tin Hàng Ngày — Lưu Trữ</h1>' >> index.html
+          echo '<p>Lưu trữ các bản tin đã gửi.</p><ul>' >> index.html
+          for f in $(ls -t newsletter-*.html 2>/dev/null); do
+            date=$(echo $f | sed 's/newsletter-//;s/\.html//')
+            echo "<li><a href=\"$f\">Bản Tin — $date</a> <span class=\"date\">($date)</span></li>" >> index.html
+          done
+          echo '</ul><p><a href="latest.html">📰 Bản tin mới nhất</a></p>' >> index.html
+          echo '</body></html>' >> index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

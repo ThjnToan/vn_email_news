@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 from datetime import datetime
 import anthropic
 from config import CLAUDE_MODEL
@@ -11,6 +12,9 @@ SECTIONS = [
     ("tech",     "CÔNG NGHỆ & KHOA HỌC"),
     ("business", "THỊ TRƯỜNG & KINH DOANH"),
 ]
+
+_MAX_RETRIES = 3
+_RETRY_DELAY = 5
 
 
 def _vietnamese_date(dt: datetime) -> str:
@@ -24,21 +28,21 @@ def _format_articles_for_prompt(news: dict[str, list[dict]]) -> str:
         articles = news.get(key, [])
         lines.append(f"\n=== {label} ===")
         for i, a in enumerate(articles, 1):
-            lines.append(f"{i}. [{a['source']}] {a['title']}")
+            img = a.get("image", "")
+            img_tag = f" [image: {img[:80]}]" if img else ""
+            lines.append(f"{i}. [{a['source']}]{img_tag} {a['title']}")
             if a["summary"]:
                 lines.append(f"   Summary: {a['summary']}")
     return "\n".join(lines)
 
 
 def _parse_response(text: str) -> dict:
-    """Parse Claude's JSON, stripping markdown fences if present."""
     text = text.strip()
     text = re.sub(r"^```(?:json)?\s*\n?", "", text)
     text = re.sub(r"\n?```\s*$", "", text)
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Last-resort: find the outermost {...}
         m = re.search(r"\{.*\}", text, re.DOTALL)
         if m:
             try:
@@ -53,7 +57,7 @@ def _section_card(label: str, image_url: str, headline: str, body: str) -> str:
     if image_url:
         img_tag = (
             f'<img src="{image_url}" alt="" '
-            f'style="width:100%;border-radius:6px;margin:10px 0 16px 0;display:block;" />'
+            f'style="width:100%%;border-radius:6px;margin:10px 0 16px 0;display:block;" />'
         )
     return f"""<div style="border:1px solid #e8e8e8;border-radius:8px;padding:24px;margin-bottom:20px;">
   <p style="font-size:11px;font-weight:700;color:#1a73e8;letter-spacing:2px;text-transform:uppercase;margin:0 0 8px 0;">{label}</p>
@@ -86,11 +90,24 @@ def _quick_bites_card(items: list[str]) -> str:
 </div>"""
 
 
-def _build_prompt(articles_text: str, date_str: str) -> str:
+def _numbers_card(items: list[str]) -> str:
+    cards = ""
+    for item in items:
+        cards += f"""<div style="flex:1;background:#f0f6ff;border-radius:6px;padding:14px;text-align:center;">
+  <p style="font-size:13px;line-height:1.5;color:#333;margin:0;font-family:Georgia,serif;">{item}</p>
+</div>"""
+    return f"""<div style="border:1px solid #e8e8e8;border-radius:8px;padding:24px;margin-bottom:20px;">
+  <p style="font-size:11px;font-weight:700;color:#1a73e8;letter-spacing:2px;text-transform:uppercase;margin:0 0 12px 0;">CON SỐ ĐÁNG CHÚ Ý</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">{cards}</div>
+</div>"""
+
+
+def _build_prompt(articles_text: str, date_str: str, weather_text: str) -> str:
+    weather_block = f"\nThời tiết hôm nay:\n{weather_text}\n" if weather_text else ""
     return f"""Viết một bản tin sáng thật tự nhiên và sinh động cho độc giả Việt Nam. Giọng văn nên thân thiện, dí dỏm, hẹp gọn nhưng đầy đủ thông tin — giống cách bạn kể chuyện cho bạn thân. Tránh ngôn từ quá cứng nhắc hay dịch máy. Tập trung vào Việt Nam và tin tức thế giới, bỏ qua những nội dung quá Mỹ-centric.
 
 Hôm nay: {date_str}
-
+{weather_block}
 Các bài viết mới:
 {articles_text}
 
@@ -100,15 +117,16 @@ Trả về JSON với cấu trúc này (nhớ dùng dấu nháy đơn cho HTML a
   "opener": {{
     "emoji": "🌿",
     "label": "ĐIỀU THÚ VỊ",
-    "text": "Một câu nhẹ nhàng mở đầu ngày. Có thể là sự kiện lịch sử ngày hôm nay, sự thật thế giới bất ngờ, hoặc chỉ một nhận xét hóm hỉnh về thứ trong tuần. Mục tiêu là làm độc giả mỉm cười."
+    "text": "Một câu nhẹ nhàng mở đầu ngày. Có thể là sự kiện lịch sử ngày hôm nay, sự thật thế giới bất ngờ, hoặc chỉ một nhận xét hóm hỉnh về thứ trong tuần."
   }},
   "intro": "<p style='font-size:16px;line-height:1.7;color:#333;'>Lời chào sáng 2-3 câu, thân thiện và tự nhiên.</p>",
   "sections": {{
-    "vietnam":  {{"headline": "Tiêu đề hấp dẫn, ngắn gọn", "body": "<p>Đoạn tin chính có 3-4 câu, khoảng 300 từ, nêu rõ những điểm chính. Dùng bullet points cho các sự kiện quan trọng.</p><p>Nếu có tin phụ khác liên quan, thêm 1-2 đoạn nữa.</p>"}},
+    "vietnam":  {{"headline": "Tiêu đề hấp dẫn, ngắn gọn", "body": "<p>Đoạn tin chính 3-4 câu, nêu rõ điểm chính. Dùng bullet points cho sự kiện quan trọng.</p><p>Nếu có tin phụ, thêm 1-2 đoạn nữa.</p>"}},
     "global":   {{"headline": "Tiêu đề ngắn gọn", "body": "<p>...</p>"}},
     "tech":     {{"headline": "Tiêu đề hấp dẫn", "body": "<p>...</p>"}},
     "business": {{"headline": "Tiêu đề thu hút", "body": "<p>...</p>"}}
   }},
+  "numbers": ["GDP Việt Nam tăng 8.2% trong quý 3", "Giá dầu Brent vượt 110 USD/thùng", "3 con số ấn tượng khác"],
   "quick_bites": ["Tin 1 dòng.", "Tin 1 dòng.", "Tin 1 dòng.", "Tin 1 dòng."],
   "signoff": "Lời tạm biệt 2 câu, tự nhiên."
 }}
@@ -117,61 +135,153 @@ Hướng dẫn:
 - Viết tất cả bằng tiếng Việt tự nhiên, không dịch máy
 - Mỗi tiêu đề: súc tích, thu hút, gợi tò mò
 - Mỗi đoạn tin: bắt đầu bằng câu nóng nhất, sau đó giải thích chi tiết
+- Nếu có ảnh article, hãy nhúng <img src="URL" style="max-width:100%;border-radius:4px;margin:8px 0;"> vào body
+- "numbers": 3-4 số liệu ấn tượng nhất từ các bài báo, mỗi cái 1 dòng
 - Quick bites: các sự kiện nhỏ gọn, 1 câu mỗi cái
 - Chỉ gửi JSON, không có markdown hay giải thích thêm
 """
 
 
-def generate_newsletter(news: dict[str, list[dict]]) -> str:
+def _call_claude(client: anthropic.Anthropic, prompt: str) -> str:
+    last_error = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            message = client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=8000,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return message.content[0].text
+        except anthropic.APIStatusError as e:
+            if e.status_code in (429, 500, 502, 503):
+                last_error = e
+                wait = _RETRY_DELAY * (attempt + 1)
+                print(f"  Claude API error (attempt {attempt+1}/{_MAX_RETRIES}): {e.status_code}, retrying in {wait}s")
+                time.sleep(wait)
+            else:
+                raise
+    raise RuntimeError(f"Claude API failed after {_MAX_RETRIES} attempts: {last_error}")
+
+
+def _fallback_html(news: dict[str, list[dict]], date_str: str) -> str:
+    body = ""
+    for key, label in SECTIONS:
+        articles = news.get(key, [])
+        items = "".join(
+            f'<li><a href="{a["link"]}" style="color:#1a73e8;">{a["title"]}</a>'
+            f'<br><span style="font-size:13px;color:#666;">{a["source"]} — {a["summary"][:200]}</span></li>'
+            for a in articles
+        )
+        body += f'<h2 style="color:#1a73e8;margin:20px 0 10px;">{label}</h2><ul style="font-size:15px;line-height:1.6;">{items}</ul>'
+
+    return f"""<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Bản Tin Hàng Ngày — {date_str}</title></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
+<div style="max-width:600px;margin:30px auto;background:#fff;border-radius:8px;padding:28px;">
+<h1 style="color:#1a73e8;">Bản Tin Hàng Ngày</h1>
+<p style="color:#666;">{date_str}</p>
+{body}
+</div></body></html>"""
+
+
+def _plain_text(news: dict[str, list[dict]], opener: dict, sections: dict, quick_bites: list[str],
+                signoff: str, date_str: str, weather_text: str) -> str:
+    lines = [f"BẢN TIN HÀNG NGÀY — {date_str}", ""]
+    if weather_text:
+        lines.append(f"Thời tiết: {weather_text}")
+        lines.append("")
+    if opener:
+        lines.append(f"{opener.get('emoji', '')} {opener.get('label', '')}: {opener.get('text', '')}")
+        lines.append("")
+    if sections:
+        for key, label in SECTIONS:
+            sec = sections.get(key, {})
+            h = sec.get("headline", "")
+            b = re.sub(r"<[^>]+>", "", sec.get("body", ""))
+            if h:
+                lines.append(f"▶ {label}")
+                lines.append(f"  {h}")
+                lines.append(f"  {b[:300]}")
+                lines.append("")
+
+    if quick_bites:
+        lines.append("TIN NHANH:")
+        for q in quick_bites:
+            lines.append(f"  • {q}")
+        lines.append("")
+
+    if signoff:
+        lines.append(re.sub(r"<[^>]+>", "", signoff))
+        lines.append("")
+
+    lines.append("---")
+    lines.append("Bản tin cá nhân hàng ngày — Tin tức Việt Nam & Quốc tế")
+    return "\n".join(lines)
+
+
+def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> tuple[str, str]:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
 
-    section_images = {
-        key: (articles[0].get("image", "") if articles else "")
-        for key, _ in SECTIONS
-        for articles in [news.get(key, [])]
-    }
-    print("Images per section:")
+    section_images = {}
+    for key, _ in SECTIONS:
+        articles = news.get(key, [])
+        section_images[key] = ""
+        for a in articles:
+            if a.get("image"):
+                section_images[key] = a["image"]
+                break
+    print("Lead images per section:")
     for key, img in section_images.items():
         print(f"  [{key}]: {img[:80] if img else '(none)'}")
 
     client = anthropic.Anthropic(api_key=api_key)
     date_str = _vietnamese_date(datetime.now())
     articles_text = _format_articles_for_prompt(news)
-    prompt = _build_prompt(articles_text, date_str)
+    prompt = _build_prompt(articles_text, date_str, weather_text)
 
-    message = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=8000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    raw = message.content[0].text
-    data = _parse_response(raw)
+    try:
+        raw = _call_claude(client, prompt)
+        data = _parse_response(raw)
+        if not data:
+            print(f"WARNING: Failed to parse Claude JSON, using fallback. Raw:\n{raw[:300]}")
+            data = {}
+    except Exception as e:
+        print(f"WARNING: Claude generation failed ({e}), using fallback template")
+        data = {}
+
+    opener = data.get("opener", {})
+    intro = data.get("intro", "")
+    sections_data = data.get("sections", {})
+    numbers = data.get("numbers", [])
+    quick_bites = data.get("quick_bites", [])
+    signoff = data.get("signoff", "")
 
     if not data:
-        raise ValueError(f"Failed to parse JSON from Claude response. Raw output:\n{raw[:500]}")
+        html = _fallback_html(news, date_str)
+        text = _plain_text(news, {}, {}, [], "", date_str, weather_text)
+        return html, text
 
-    # Build HTML — Python controls the card structure and image placement
-    opener_html = _opener_card(data.get("opener", {}))
-    intro_html = data.get("intro", "")
-    signoff_html = f'<p style="font-size:15px;line-height:1.7;color:#666;margin-top:8px;">{data.get("signoff", "")}</p>'
+    opener_html = _opener_card(opener)
+    intro_html = intro
+    signoff_html = f'<p style="font-size:15px;line-height:1.7;color:#666;margin-top:8px;">{signoff}</p>'
 
     sections_html = ""
     for key, label in SECTIONS:
-        sec = data.get("sections", {}).get(key, {})
+        sec = sections_data.get(key, {})
         headline = sec.get("headline", "")
         body = sec.get("body", "")
         image_url = section_images.get(key, "")
         sections_html += _section_card(label, image_url, headline, body)
-        print(f"  Built card [{key}], image={'yes' if image_url else 'no'}")
 
-    quick_bites = data.get("quick_bites", [])
+    numbers_html = _numbers_card(numbers) if numbers else ""
     quick_html = _quick_bites_card(quick_bites) if quick_bites else ""
 
-    body_html = opener_html + intro_html + sections_html + quick_html + signoff_html
+    body_html = opener_html + intro_html + sections_html + numbers_html + quick_html + signoff_html
 
-    return f"""<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
@@ -193,3 +303,7 @@ def generate_newsletter(news: dict[str, list[dict]]) -> str:
   </div>
 </body>
 </html>"""
+
+    text = _plain_text(news, opener, sections_data, quick_bites, signoff, date_str, weather_text)
+
+    return html, text

@@ -2,10 +2,10 @@ import feedparser
 import html
 import re
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin
 from config import NEWS_SOURCES, ARTICLES_PER_SOURCE
 
-# Full browser-like headers to avoid being blocked
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -14,7 +14,6 @@ _HEADERS = {
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.5",
-    "Connection": "keep-alive",
 }
 
 
@@ -25,7 +24,6 @@ def _clean_text(text: str) -> str:
 
 
 def _extract_rss_image(entry) -> str:
-    """Pull image from RSS feed fields (no HTTP request needed)."""
     for m in entry.get("media_content", []):
         url = m.get("url", "")
         if url:
@@ -47,15 +45,11 @@ def _extract_rss_image(entry) -> str:
 
 
 def _fetch_og_image(article_url: str) -> str:
-    """Fetch article page and extract og:image or twitter:image."""
     if not article_url:
         return ""
     try:
-        resp = requests.get(article_url, timeout=8, headers=_HEADERS)
+        resp = requests.get(article_url, timeout=6, headers=_HEADERS)
         page = resp.text
-
-        # Two-step: find any <meta> tag that contains og:image or twitter:image,
-        # then pull the content= value from it. Much more robust than one regex.
         for tag_pattern in [
             r'<meta[^>]*og:image[^>]*/?>',
             r'<meta[^>]*twitter:image[^>]*/?>',
@@ -67,16 +61,27 @@ def _fetch_og_image(article_url: str) -> str:
                 )
                 if content:
                     img_url = content.group(1).strip()
-                    # Make relative URLs absolute
                     if img_url and not img_url.startswith("http"):
                         img_url = urljoin(article_url, img_url)
                     if img_url:
                         return img_url
-
-        print(f"  og:image not found on page: {article_url[:70]}")
-    except Exception as e:
-        print(f"  og:image fetch error ({article_url[:60]}): {e}")
+    except Exception:
+        pass
     return ""
+
+
+def _enrich_article_images(articles: list[dict]) -> list[dict]:
+    to_fetch = [(i, a) for i, a in enumerate(articles) if a.get("link") and not a.get("image")]
+    if not to_fetch:
+        return articles
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        fut = {pool.submit(_fetch_og_image, a["link"]): i for i, a in to_fetch}
+        for f in as_completed(fut):
+            idx = fut[f]
+            img = f.result()
+            if img:
+                articles[idx]["image"] = img
+    return articles
 
 
 def _fetch_source(url: str, name: str, limit: int) -> list[dict]:
@@ -91,11 +96,13 @@ def _fetch_source(url: str, name: str, limit: int) -> list[dict]:
             if title:
                 articles.append({
                     "title": title,
-                    "summary": summary[:500],
+                    "summary": summary[:400],
                     "link": link,
                     "source": name,
                     "image": image,
                 })
+        if articles:
+            articles = _enrich_article_images(articles)
         return articles
     except Exception as e:
         print(f"Warning: could not fetch {name} ({url}): {e}")
@@ -109,30 +116,8 @@ def fetch_all_news() -> dict[str, list[dict]]:
         for src in sources:
             articles.extend(_fetch_source(src["url"], src["name"], ARTICLES_PER_SOURCE))
 
-        # Find an image for the lead article — try up to 3 articles per section
-        image_found = False
-        for i, article in enumerate(articles[:3]):
-            if article["image"]:
-                print(f"  [{section}] RSS image found on article {i}: {article['image'][:70]}")
-                # Move image-bearing article to front if it's not already there
-                if i > 0:
-                    articles[0]["image"] = article["image"]
-                image_found = True
-                break
-
-        if not image_found:
-            # Fall back to og:image scraping for first 3 articles
-            for i, article in enumerate(articles[:3]):
-                print(f"  [{section}] Trying og:image for article {i}: {article['title'][:55]}")
-                img = _fetch_og_image(article["link"])
-                if img:
-                    articles[0]["image"] = img
-                    print(f"  [{section}] og:image SUCCESS: {img[:70]}")
-                    image_found = True
-                    break
-
-        if not image_found:
-            print(f"  [{section}] WARNING: No image found for any lead article")
+        image_count = sum(1 for a in articles[:6] if a.get("image"))
+        print(f"  [{section}] {len(articles)} articles, {image_count} with images")
 
         results[section] = articles
     return results

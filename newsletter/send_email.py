@@ -6,7 +6,7 @@ from email.mime.text import MIMEText
 from config import RECIPIENT_EMAILS
 
 
-def send_newsletter(html_content: str) -> None:
+def send_newsletter(html_content: str, text_content: str = "") -> None:
     gmail_user = os.environ.get("GMAIL_USER")
     gmail_password = os.environ.get("GMAIL_APP_PASSWORD")
 
@@ -22,7 +22,9 @@ def send_newsletter(html_content: str) -> None:
     msg["From"] = gmail_user
     msg["To"] = ", ".join(RECIPIENT_EMAILS)
 
-    msg.attach(MIMEText(html_content, "html"))
+    if text_content:
+        msg.attach(MIMEText(text_content, "plain", "utf-8"))
+    msg.attach(MIMEText(html_content, "html", "utf-8"))
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.ehlo()

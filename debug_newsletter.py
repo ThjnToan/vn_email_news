@@ -29,13 +29,18 @@ def main():
             print(f"           image: {img if img else '*** NONE ***'}")
 
     print("\n=== Generating newsletter ===")
-    html = generate_newsletter(news)
+    html, text = generate_newsletter(news)
 
     out_path = os.path.join(os.path.dirname(__file__), "debug_output.html")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
 
-    print(f"\nSaved to: {out_path}")
+    out_text = os.path.join(os.path.dirname(__file__), "debug_output.txt")
+    with open(out_text, "w", encoding="utf-8") as f:
+        f.write(text)
+
+    print(f"\nSaved HTML to: {out_path}")
+    print(f"Saved text to: {out_text}")
     print("Open debug_output.html in your browser to inspect.")
     print("\n=== <img> tags in output ===")
     import re
