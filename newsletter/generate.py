@@ -7,10 +7,10 @@ import anthropic
 from config import CLAUDE_MODEL
 
 SECTIONS = [
-    ("vietnam",  "VIỆT NAM HÔM NAY"),
-    ("global",   "THẾ GIỚI XUNG QUANH"),
-    ("tech",     "CÔNG NGHỆ & KHOA HỌC"),
-    ("business", "THỊ TRƯỜNG & KINH DOANH"),
+    ("vietnam",  "VIỆT NAM", "#dc2626", "🇻🇳"),
+    ("global",   "THẾ GIỚI", "#2563eb", "🌍"),
+    ("tech",     "CÔNG NGHỆ", "#7c3aed", "🚀"),
+    ("business", "KINH DOANH", "#059669", "📈"),
 ]
 
 _MAX_RETRIES = 3
@@ -19,12 +19,12 @@ _RETRY_DELAY = 5
 
 def _vietnamese_date(dt: datetime) -> str:
     days_vi = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
-    return f"{days_vi[dt.weekday()]}, ngày {dt.day} tháng {dt.month} năm {dt.year}"
+    return f"{days_vi[dt.weekday()]}, {dt.day} tháng {dt.month}"
 
 
 def _format_articles_for_prompt(news: dict[str, list[dict]]) -> str:
     lines = []
-    for key, label in SECTIONS:
+    for key, label, _, _ in SECTIONS:
         articles = news.get(key, [])
         lines.append(f"\n=== {label} ===")
         for i, a in enumerate(articles, 1):
@@ -52,66 +52,144 @@ def _parse_response(text: str) -> dict:
     return {}
 
 
-def _section_card(label: str, image_url: str, headline: str, body: str) -> str:
-    img_tag = ""
-    if image_url:
-        img_tag = (
-            f'<img src="{image_url}" alt="" '
-            f'style="width:100%%;border-radius:6px;margin:10px 0 16px 0;display:block;" />'
-        )
-    return f"""<div style="border:1px solid #e8e8e8;border-radius:8px;padding:24px;margin-bottom:20px;">
-  <p style="font-size:11px;font-weight:700;color:#1a73e8;letter-spacing:2px;text-transform:uppercase;margin:0 0 8px 0;">{label}</p>
-  {img_tag}
-  <h2 style="font-size:22px;font-weight:bold;color:#111;font-family:Arial,sans-serif;margin:0 0 12px 0;">{headline}</h2>
-  <div style="font-size:15px;line-height:1.7;color:#333;font-family:Georgia,serif;">{body}</div>
-</div>"""
+def _header(date_str: str) -> str:
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:0 0 16px 16px;">
+  <tr><td style="padding:32px 24px 28px;text-align:center;">
+    <div style="font-size:36px;margin-bottom:8px;">☀️</div>
+    <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:-0.5px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Bản Tin Hàng Ngày</h1>
+    <p style="margin:8px 0 0;color:#94a3b8;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{date_str} · Phiên bản Việt Nam &amp; Thế giới</p>
+  </td></tr>
+</table>"""
+
+
+def _weather_bar(weather_text: str) -> str:
+    if not weather_text:
+        return ""
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;">
+  <tr><td style="background:#f0f9ff;border-radius:12px;padding:14px 20px;text-align:center;">
+    <p style="margin:0;color:#0369a1;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">🌤️ <strong>Thời tiết hôm nay:</strong> {weather_text}</p>
+  </td></tr>
+</table>"""
 
 
 def _opener_card(opener: dict) -> str:
-    emoji = opener.get("emoji", "☀️")
-    label = opener.get("label", "CHÀO BUỔI SÁNG")
+    emoji = opener.get("emoji", "🌿")
+    label = opener.get("label", "ĐIỀU THÚ VỊ")
     text = opener.get("text", "")
-    return f"""<div style="background:#FFFBEA;border-left:4px solid #F5A623;border-radius:8px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:flex-start;gap:14px;">
-  <span style="font-size:36px;line-height:1;flex-shrink:0;">{emoji}</span>
-  <div>
-    <p style="font-size:10px;font-weight:700;color:#B87800;letter-spacing:2px;text-transform:uppercase;margin:0 0 6px 0;">{label}</p>
-    <p style="font-size:15px;line-height:1.7;color:#5C4300;margin:0;">{text}</p>
-  </div>
-</div>"""
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">
+  <tr><td style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:12px;padding:20px 24px;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td width="40" valign="top" style="font-size:32px;line-height:1;">{emoji}</td>
+      <td valign="top">
+        <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#b45309;letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{label}</p>
+        <p style="margin:0;font-size:15px;line-height:1.7;color:#78350f;font-family:Georgia,'Times New Roman',serif;">{text}</p>
+      </td>
+    </tr></table>
+  </td></tr>
+</table>"""
 
 
-def _quick_bites_card(items: list[str]) -> str:
-    lis = "".join(
-        f'<li style="margin-bottom:8px;">{item}</li>' for item in items
-    )
-    return f"""<div style="border:1px solid #e8e8e8;border-radius:8px;padding:24px;margin-bottom:20px;">
-  <p style="font-size:11px;font-weight:700;color:#1a73e8;letter-spacing:2px;text-transform:uppercase;margin:0 0 12px 0;">TIN NHANH</p>
-  <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;color:#333;font-family:Georgia,serif;">{lis}</ul>
-</div>"""
+def _intro_block(intro: str) -> str:
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+  <tr><td style="padding:0 4px;">
+    <div style="font-size:16px;line-height:1.8;color:#334155;font-family:Georgia,'Times New Roman',serif;">{intro}</div>
+  </td></tr>
+</table>"""
+
+
+def _section_card(key: str, label: str, accent: str, icon: str, image_url: str, headline: str, body: str) -> str:
+    img_block = ""
+    if image_url:
+        img_block = f"""<tr><td style="padding:0 0 16px;">
+      <img src="{image_url}" alt="" style="width:100%;height:200px;object-fit:cover;border-radius:8px;display:block;" />
+    </td></tr>"""
+
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+  <tr><td style="padding:20px 24px 16px;border-top:4px solid {accent};border-radius:12px 12px 0 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="font-size:20px;padding-right:8px;">{icon}</td>
+      <td>
+        <p style="margin:0;font-size:11px;font-weight:700;color:{accent};letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{label}</p>
+      </td>
+    </tr></table>
+  </td></tr>
+  {img_block}
+  <tr><td style="padding:0 24px 20px;">
+    <h2 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;letter-spacing:-0.3px;">{headline}</h2>
+    <div style="font-size:15px;line-height:1.75;color:#475569;font-family:Georgia,'Times New Roman',serif;">{body}</div>
+  </td></tr>
+</table>"""
 
 
 def _numbers_card(items: list[str]) -> str:
+    if not items:
+        return ""
     cards = ""
     for item in items:
-        cards += f"""<div style="flex:1;background:#f0f6ff;border-radius:6px;padding:14px;text-align:center;">
-  <p style="font-size:13px;line-height:1.5;color:#333;margin:0;font-family:Georgia,serif;">{item}</p>
-</div>"""
-    return f"""<div style="border:1px solid #e8e8e8;border-radius:8px;padding:24px;margin-bottom:20px;">
-  <p style="font-size:11px;font-weight:700;color:#1a73e8;letter-spacing:2px;text-transform:uppercase;margin:0 0 12px 0;">CON SỐ ĐÁNG CHÚ Ý</p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;">{cards}</div>
-</div>"""
+        cards += f"""<td style="padding:4px;">
+          <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-radius:10px;padding:16px 12px;text-align:center;border:1px solid #bfdbfe;">
+            <p style="margin:0;font-size:13px;line-height:1.5;color:#1e40af;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-weight:600;">{item}</p>
+          </div>
+        </td>"""
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+  <tr><td style="padding:0 0 12px;">
+    <p style="margin:0;font-size:11px;font-weight:700;color:#475569;letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">📊 CON SỐ ĐÁNG CHÚ Ý</p>
+  </td></tr>
+  <tr><td>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>{cards}</tr></table>
+  </td></tr>
+</table>"""
+
+
+def _quick_bites_card(items: list[str]) -> str:
+    if not items:
+        return ""
+    lis = "".join(
+        f"""<tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td width="24" valign="top" style="color:#f59e0b;font-size:14px;">⚡</td>
+            <td valign="top" style="font-size:14px;line-height:1.6;color:#475569;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{item}</td>
+          </tr></table>
+        </td></tr>"""
+        for item in items
+    )
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;background:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+  <tr><td style="padding:20px 24px 16px;border-bottom:1px solid #e2e8f0;">
+    <p style="margin:0;font-size:11px;font-weight:700;color:#475569;letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">⚡ TIN NHANH</p>
+  </td></tr>
+  <tr><td style="padding:0 24px 12px;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">{lis}</table>
+  </td></tr>
+</table>"""
+
+
+def _signoff_block(signoff: str) -> str:
+    return f"""<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
+  <tr><td style="border-top:1px solid #e2e8f0;padding:20px 0 0;">
+    <p style="margin:0;font-size:15px;line-height:1.7;color:#64748b;font-family:Georgia,'Times New Roman',serif;font-style:italic;text-align:center;">{signoff}</p>
+  </td></tr>
+</table>"""
+
+
+def _footer() -> str:
+    return """<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;border-radius:12px 12px 0 0;margin-top:8px;">
+  <tr><td style="padding:24px;text-align:center;">
+    <p style="margin:0 0 8px;font-size:13px;color:#64748b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Bản tin cá nhân hàng ngày · Tin tức Việt Nam &amp; Quốc tế</p>
+    <p style="margin:0;font-size:12px;color:#94a3b8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Gửi từ 🤖 với 💙</p>
+  </td></tr>
+</table>"""
 
 
 def _build_prompt(articles_text: str, date_str: str, weather_text: str) -> str:
-    weather_block = f"\nThời tiết hôm nay:\n{weather_text}\n" if weather_text else ""
-    return f"""Viết một bản tin sáng thật tự nhiên và sinh động cho độc giả Việt Nam. Giọng văn nên thân thiện, dí dỏm, hẹp gọn nhưng đầy đủ thông tin — giống cách bạn kể chuyện cho bạn thân. Tránh ngôn từ quá cứng nhắc hay dịch máy. Tập trung vào Việt Nam và tin tức thế giới, bỏ qua những nội dung quá Mỹ-centric.
+    weather_block = f"\nThời tiết hôm nay: {weather_text}\n" if weather_text else ""
+    return f"""Viết một bản tin sáng thật tự nhiên và sinh động cho độc giả Việt Nam. Giọng văn nên thân thiện, dí dỏm, gọn nhưng đầy đủ thông tin — giống cách bạn kể chuyện cho bạn thân. Tránh ngôn từ quá cứng nhắc hay dịch máy. Tập trung vào Việt Nam và tin tức thế giới, bỏ qua những nội dung quá Mỹ-centric.
 
 Hôm nay: {date_str}
 {weather_block}
 Các bài viết mới:
 {articles_text}
 
-Trả về JSON với cấu trúc này (nhớ dùng dấu nháy đơn cho HTML attributes):
+Trả về JSON với cấu trúc này (dùng dấu nháy đơn cho HTML attributes):
 
 {{
   "opener": {{
@@ -119,14 +197,14 @@ Trả về JSON với cấu trúc này (nhớ dùng dấu nháy đơn cho HTML a
     "label": "ĐIỀU THÚ VỊ",
     "text": "Một câu nhẹ nhàng mở đầu ngày. Có thể là sự kiện lịch sử ngày hôm nay, sự thật thế giới bất ngờ, hoặc chỉ một nhận xét hóm hỉnh về thứ trong tuần."
   }},
-  "intro": "<p style='font-size:16px;line-height:1.7;color:#333;'>Lời chào sáng 2-3 câu, thân thiện và tự nhiên.</p>",
+  "intro": "<p>Lời chào sáng 2-3 câu, thân thiện và tự nhiên.</p>",
   "sections": {{
     "vietnam":  {{"headline": "Tiêu đề hấp dẫn, ngắn gọn", "body": "<p>Đoạn tin chính 3-4 câu, nêu rõ điểm chính. Dùng bullet points cho sự kiện quan trọng.</p><p>Nếu có tin phụ, thêm 1-2 đoạn nữa.</p>"}},
     "global":   {{"headline": "Tiêu đề ngắn gọn", "body": "<p>...</p>"}},
     "tech":     {{"headline": "Tiêu đề hấp dẫn", "body": "<p>...</p>"}},
     "business": {{"headline": "Tiêu đề thu hút", "body": "<p>...</p>"}}
   }},
-  "numbers": ["GDP Việt Nam tăng 8.2% trong quý 3", "Giá dầu Brent vượt 110 USD/thùng", "3 con số ấn tượng khác"],
+  "numbers": ["GDP Việt Nam tăng 8.2%", "Giá dầu 110 USD/thùng", "3 con số ấn tượng"],
   "quick_bites": ["Tin 1 dòng.", "Tin 1 dòng.", "Tin 1 dòng.", "Tin 1 dòng."],
   "signoff": "Lời tạm biệt 2 câu, tự nhiên."
 }}
@@ -134,9 +212,9 @@ Trả về JSON với cấu trúc này (nhớ dùng dấu nháy đơn cho HTML a
 Hướng dẫn:
 - Viết tất cả bằng tiếng Việt tự nhiên, không dịch máy
 - Mỗi tiêu đề: súc tích, thu hút, gợi tò mò
-- Mỗi đoạn tin: bắt đầu bằng câu nóng nhất, sau đó giải thích chi tiết
-- Nếu có ảnh article, hãy nhúng <img src="URL" style="max-width:100%;border-radius:4px;margin:8px 0;"> vào body
-- "numbers": 3-4 số liệu ấn tượng nhất từ các bài báo, mỗi cái 1 dòng
+- Mỗi đoạn tin: bắt đầu bằng câu nóng nhất, sau đó giải thích
+- body chỉ cần đoạn văn và bullet points, KHÔNG cần nhúng ảnh (ảnh đã được thêm ở ngoài)
+- "numbers": 3-4 số liệu ấn tượng nhất từ các bài báo, mỗi cái 1 dòng ngắn
 - Quick bites: các sự kiện nhỏ gọn, 1 câu mỗi cái
 - Chỉ gửi JSON, không có markdown hay giải thích thêm
 """
@@ -165,23 +243,24 @@ def _call_claude(client: anthropic.Anthropic, prompt: str) -> str:
 
 def _fallback_html(news: dict[str, list[dict]], date_str: str) -> str:
     body = ""
-    for key, label in SECTIONS:
+    for key, label, accent, icon in SECTIONS:
         articles = news.get(key, [])
         items = "".join(
-            f'<li><a href="{a["link"]}" style="color:#1a73e8;">{a["title"]}</a>'
-            f'<br><span style="font-size:13px;color:#666;">{a["source"]} — {a["summary"][:200]}</span></li>'
+            f'<li style="margin-bottom:12px;font-size:15px;line-height:1.6;"><a href="{a["link"]}" style="color:{accent};text-decoration:none;font-weight:600;">{a["title"]}</a><br><span style="font-size:13px;color:#64748b;">{a["source"]}</span></li>'
             for a in articles
         )
-        body += f'<h2 style="color:#1a73e8;margin:20px 0 10px;">{label}</h2><ul style="font-size:15px;line-height:1.6;">{items}</ul>'
+        body += f'<h2 style="color:{accent};font-size:18px;margin:24px 0 12px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">{icon} {label}</h2><ul style="padding-left:20px;margin:0;">{items}</ul>'
 
     return f"""<!DOCTYPE html>
 <html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Bản Tin Hàng Ngày — {date_str}</title></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
-<div style="max-width:600px;margin:30px auto;background:#fff;border-radius:8px;padding:28px;">
-<h1 style="color:#1a73e8;">Bản Tin Hàng Ngày</h1>
-<p style="color:#666;">{date_str}</p>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="max-width:600px;margin:0 auto;background:#ffffff;">
+{_header(date_str)}
+<div style="padding:24px;">
 {body}
+</div>
+{_footer()}
 </div></body></html>"""
 
 
@@ -195,7 +274,7 @@ def _plain_text(news: dict[str, list[dict]], opener: dict, sections: dict, quick
         lines.append(f"{opener.get('emoji', '')} {opener.get('label', '')}: {opener.get('text', '')}")
         lines.append("")
     if sections:
-        for key, label in SECTIONS:
+        for key, label, _, _ in SECTIONS:
             sec = sections.get(key, {})
             h = sec.get("headline", "")
             b = re.sub(r"<[^>]+>", "", sec.get("body", ""))
@@ -215,7 +294,7 @@ def _plain_text(news: dict[str, list[dict]], opener: dict, sections: dict, quick
         lines.append(re.sub(r"<[^>]+>", "", signoff))
         lines.append("")
 
-    lines.append("---")
+    lines.append("—")
     lines.append("Bản tin cá nhân hàng ngày — Tin tức Việt Nam & Quốc tế")
     return "\n".join(lines)
 
@@ -226,7 +305,7 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
         raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
 
     section_images = {}
-    for key, _ in SECTIONS:
+    for key, _, _, _ in SECTIONS:
         articles = news.get(key, [])
         section_images[key] = ""
         for a in articles:
@@ -264,22 +343,23 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
         text = _plain_text(news, {}, {}, [], "", date_str, weather_text)
         return html, text
 
-    opener_html = _opener_card(opener)
-    intro_html = intro
-    signoff_html = f'<p style="font-size:15px;line-height:1.7;color:#666;margin-top:8px;">{signoff}</p>'
-
+    # Build full HTML
     sections_html = ""
-    for key, label in SECTIONS:
+    for key, label, accent, icon in SECTIONS:
         sec = sections_data.get(key, {})
         headline = sec.get("headline", "")
         body = sec.get("body", "")
         image_url = section_images.get(key, "")
-        sections_html += _section_card(label, image_url, headline, body)
+        sections_html += _section_card(key, label, accent, icon, image_url, headline, body)
 
-    numbers_html = _numbers_card(numbers) if numbers else ""
-    quick_html = _quick_bites_card(quick_bites) if quick_bites else ""
-
-    body_html = opener_html + intro_html + sections_html + numbers_html + quick_html + signoff_html
+    body_html = (
+        _opener_card(opener)
+        + _intro_block(intro)
+        + sections_html
+        + _numbers_card(numbers)
+        + _quick_bites_card(quick_bites)
+        + _signoff_block(signoff)
+    )
 
     html = f"""<!DOCTYPE html>
 <html lang="vi">
@@ -288,18 +368,14 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bản Tin Hàng Ngày — {date_str}</title>
 </head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
-  <div style="max-width:600px;margin:30px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-    <div style="background:#1a73e8;padding:24px 28px;">
-      <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">&#9728;&#65039; Bản Tin Hàng Ngày</h1>
-      <p style="margin:6px 0 0;color:#d0e4ff;font-size:13px;">{date_str} &nbsp;&middot;&nbsp; Phiên bản Việt Nam &amp; Thế giới</p>
-    </div>
-    <div style="padding:24px 28px;">
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;">
+    {_header(date_str)}
+    <div style="padding:24px;">
+      {_weather_bar(weather_text)}
       {body_html}
     </div>
-    <div style="background:#f5f5f5;padding:16px 28px;text-align:center;font-size:12px;color:#999;">
-      Bản tin cá nhân hàng ngày &nbsp;&middot;&nbsp; Tin tức Việt Nam &amp; Quốc tế
-    </div>
+    {_footer()}
   </div>
 </body>
 </html>"""
