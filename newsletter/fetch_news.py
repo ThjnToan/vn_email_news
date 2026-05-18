@@ -1,6 +1,7 @@
 import feedparser
 import html
 import re
+import unicodedata
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin
@@ -20,7 +21,10 @@ _HEADERS = {
 def _clean_text(text: str) -> str:
     text = re.sub(r"<[^>]+>", " ", text)
     text = html.unescape(text)
-    return " ".join(text.split()).strip()
+    text = " ".join(text.split()).strip()
+    # Normalize Vietnamese combining marks to precomposed form
+    text = unicodedata.normalize("NFC", text)
+    return text
 
 
 def _enhance_image_url(url: str) -> str:

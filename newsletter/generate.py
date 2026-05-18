@@ -2,6 +2,7 @@ import json
 import os
 import re
 import time
+import unicodedata
 from datetime import datetime
 import anthropic
 from config import CLAUDE_MODEL
@@ -479,5 +480,9 @@ def generate_newsletter(news: dict[str, list[dict]], weather_text: str = "") -> 
 </html>"""
 
     text = _plain_text(news, data, date_str, weather_text)
+
+    # Normalize Vietnamese combining marks to precomposed form
+    html = unicodedata.normalize("NFC", html)
+    text = unicodedata.normalize("NFC", text)
 
     return html, text

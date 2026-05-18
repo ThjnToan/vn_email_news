@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+import unicodedata
 import requests
 from datetime import datetime
 from newsletter.fetch_news import fetch_all_news
@@ -32,6 +33,7 @@ def main():
 
     print("\n[1/4] Fetching weather...")
     weather = _fetch_weather()
+    weather = unicodedata.normalize("NFC", weather) if weather else weather
     print(f"  Weather: {weather}" if weather else "  Weather: unavailable (continuing)")
 
     print("\n[2/4] Fetching news...")
